@@ -1,86 +1,77 @@
-﻿# PROMPTS.md
+﻿# PROMPTS.md — Aula 4
+## CRUD da API Principal com Django REST Framework
 
-## Objetivo
-
-Este arquivo registra os principais prompts utilizados durante o desenvolvimento da infraestrutura Docker da Aula 3.
-
-## 1. Criação do Dockerfile
-
-### Prompt utilizado
-
-> Crie um Dockerfile para uma aplicação Python Flask simples utilizando multistage build, cache de dependências e execução com usuário não-root. A aplicação deve utilizar a porta 8000 e possuir uma etapa de build separada da etapa de runtime.
-
-### Resultado
-
-Foi criado um Dockerfile com duas etapas:
-
-- `builder`: responsável pela instalação das dependências;
-- `runtime`: responsável pela execução da aplicação.
-
-Também foi utilizado cache do pip durante a instalação das dependências.
+Este arquivo registra os principais prompts utilizados durante o desenvolvimento da Aula 4, as etapas realizadas com apoio de IA e as intervenções manuais feitas no projeto.
 
 ---
 
-## 2. Revisão do Dockerfile
+## 1. Objetivo da atividade
 
-### Prompt utilizado
+Desenvolver uma API REST utilizando Django REST Framework, integrada ao ambiente Docker e ao PostgreSQL já utilizado na Aula 3.
 
-> Revise este Dockerfile verificando se ele utiliza multistage build, cache eficiente de dependências e usuário não-root. Identifique possíveis problemas e sugira melhorias mantendo o projeto simples e dentro do escopo da Aula 3.
-
-### Resultado
-
-A estrutura foi revisada para garantir:
-
-- separação entre build e runtime;
-- aproveitamento do cache do pip;
-- execução da aplicação com o usuário `appuser`;
-- exposição da porta 8000.
+A atividade foi realizada aproveitando a estrutura do projeto `Docker_Essencial`, mantendo o código da Aula 3 e adaptando a aplicação para Django REST Framework.
 
 ---
 
-## 3. Criação do Docker Compose
+## 2. Tecnologias utilizadas
 
-### Prompt utilizado
-
-> Crie um docker-compose.yml simples para uma API Flask e um banco PostgreSQL. A API deve ser construída a partir de um Dockerfile e o banco deve utilizar variáveis de ambiente essenciais, volume persistente e healthcheck. A API deve aguardar o banco ficar saudável antes de iniciar.
-
-### Resultado
-
-Foi criado um Compose com dois serviços:
-
-- `api`;
-- `db`.
-
-Foi configurado um healthcheck para o PostgreSQL e uma dependência entre os serviços.
+- Python 3.12
+- Django 5.2.6
+- Django REST Framework 3.16.1
+- PostgreSQL 16
+- Docker
+- Docker Compose
+- Postman / Django REST Framework Browsable API
 
 ---
 
-## 4. Correções e validações
+## 3. Principais prompts utilizados
 
-Durante a execução foram realizadas validações práticas do ambiente.
+### Prompt 1 — Adaptação do projeto da Aula 3
 
-Foi verificado que:
+> Quero aproveitar o projeto da Aula 3 com Docker e PostgreSQL para desenvolver a Aula 4 utilizando Django REST Framework, sem criar outro projeto do zero.
 
-- a API iniciou corretamente;
-- o PostgreSQL iniciou corretamente;
-- a rota `/health` respondeu com status `ok`;
-- a conexão com o banco foi identificada como `connected`;
-- o container da API executou com o usuário não-root `appuser`;
-- o histórico da imagem foi analisado com `docker history`;
-- os logs dos containers foram analisados com `docker compose logs`.
+### Prompt 2 — Configuração do Django
 
-## 5. Conceitos aplicados
+> Como configurar o Django dentro do Docker e integrar o Django REST Framework ao projeto existente?
 
-Os principais conceitos utilizados foram:
+### Prompt 3 — PostgreSQL
 
-- Dockerfile;
-- imagens e containers;
-- multistage build;
-- cache de dependências;
-- usuário não-root;
-- Docker Compose;
-- variáveis de ambiente;
-- healthcheck;
-- volumes;
-- logs;
-- health check da aplicação.
+> Como configurar o Django para utilizar o PostgreSQL já existente no Docker Compose?
+
+### Prompt 4 — Criação dos modelos
+
+> Criar os modelos Category e Item utilizando Django ORM, com relacionamento entre eles e campos adequados para a API.
+
+### Prompt 5 — Serializers
+
+> Criar ModelSerializers para Category e Item, incluindo validações para os campos recebidos pela API.
+
+### Prompt 6 — CRUD
+
+> Criar ModelViewSets para Category e Item utilizando Django REST Framework.
+
+### Prompt 7 — Rotas
+
+> Configurar DefaultRouter para disponibilizar os endpoints da API em /api/v1/.
+
+### Prompt 8 — Testes
+
+> Testar os endpoints CRUD e verificar os códigos HTTP 200, 201, 204, 400 e 404.
+
+### Prompt 9 — Documentação
+
+> Organizar a coleção de testes do Postman e registrar as etapas realizadas no PROMPTS.md.
+
+---
+
+## 4. Desenvolvimento realizado
+
+### 4.1 Configuração do ambiente
+
+O projeto da Aula 3 foi reutilizado.
+
+O Dockerfile foi adaptado para executar o Django:
+
+```text
+python app/manage.py runserver 0.0.0.0:8000
