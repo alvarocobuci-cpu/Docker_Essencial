@@ -1,56 +1,41 @@
-# Aula 4 - CRUD da API Principal com Django REST Framework
+## Aula 6 — Modelagem Relacional, Índices e Migrações
 
-## Objetivo
+Nesta etapa, o projeto foi ampliado para utilizar persistência de dados no PostgreSQL por meio do SQLAlchemy e do Alembic.
 
-Este projeto foi desenvolvido como parte da Aula 4 do curso, com foco na criação de uma API REST utilizando Django REST Framework.
+### Modelagem do banco de dados
 
-A aplicação foi desenvolvida aproveitando a estrutura Docker da Aula 3 e integrada ao PostgreSQL por meio do Docker Compose.
+Foi criada a entidade `InventoryItem`, responsável pelo armazenamento dos itens do estoque.
 
-Nesta etapa foram implementados modelos, serializers, ViewSets e rotas para disponibilizar operações completas de CRUD para categorias e itens.
+A tabela `inventory_items` possui os seguintes campos:
 
-## Tecnologias utilizadas
+- `id`: identificador único do item.
+- `name`: nome do produto.
+- `quantity`: quantidade disponível em estoque.
+- `minimum_quantity`: quantidade mínima definida para o estoque.
 
-- Python 3.12
-- Django 5.2.6
-- Django REST Framework 3.16.1
-- PostgreSQL 16
-- Docker
-- Docker Compose
-- Postman
+Foram utilizadas restrições de integridade para impedir valores negativos nos campos `quantity` e `minimum_quantity`.
 
-## Estrutura do projeto
+### Índices
 
-```text
-Docker_Essencial/
+Foi criado um índice no campo `name`:
 
-├── app/
-│   ├── aula4api/
-│   │   ├── migrations/
-│   │   ├── __init__.py
-│   │   ├── admin.py
-│   │   ├── apps.py
-│   │   ├── models.py
-│   │   ├── serializers.py
-│   │   ├── tests.py
-│   │   └── views.py
-│   │
-│   ├── config/
-│   │   ├── __init__.py
-│   │   ├── asgi.py
-│   │   ├── settings.py
-│   │   ├── urls.py
-│   │   └── wsgi.py
-│   │
-│   ├── flask_app_aula3.py
-│   └── manage.py
-│
-├── postman/
-│   └── Aula4_DRF_Collection.json
-│
-├── Dockerfile
-├── docker-compose.yml
-├── .dockerignore
-├── .gitignore
-├── requirements.txt
-├── README.md
-└── PROMPTS.md
+`ix_inventory_items_name`
+
+O objetivo é melhorar a eficiência de consultas que utilizem o nome do item.
+
+### Migrações com Alembic
+
+O Alembic foi configurado para controlar a evolução do schema da tabela `inventory_items`.
+
+A primeira migração criou:
+
+- tabela `inventory_items`;
+- chave primária;
+- restrição para quantidade não negativa;
+- restrição para quantidade mínima não negativa;
+- índice no campo `name`.
+
+A migração foi aplicada com sucesso utilizando:
+
+```bash
+alembic upgrade head

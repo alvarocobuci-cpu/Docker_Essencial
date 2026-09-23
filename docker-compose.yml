@@ -27,7 +27,21 @@ services:
     ports:
       - "8001:8001"
 
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      POSTGRES_DB: appdb
+      POSTGRES_USER: appuser
+      POSTGRES_PASSWORD: apppassword
+
+    depends_on:
+      db:
+        condition: service_healthy
+
     command: uvicorn app.inventory.main:app --host 0.0.0.0 --port 8001
+
+    volumes:
+      - .:/workspace
 
   db:
     image: postgres:16-alpine
