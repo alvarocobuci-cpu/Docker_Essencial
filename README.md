@@ -1,41 +1,109 @@
-## Aula 6 — Modelagem Relacional, Índices e Migrações
+# Docker_Essencial — SynapseShop
 
-Nesta etapa, o projeto foi ampliado para utilizar persistência de dados no PostgreSQL por meio do SQLAlchemy e do Alembic.
+Projeto desenvolvido durante as aulas do curso de Programação em Python do Senac.
 
-### Modelagem do banco de dados
+O projeto começou como uma aplicação simples utilizando Flask, Docker e PostgreSQL e foi sendo desenvolvido ao longo das aulas. Com o avanço das atividades, foram adicionadas uma API em Django REST Framework, um microsserviço de estoque com FastAPI, persistência com PostgreSQL, SQLAlchemy e migrações com Alembic.
 
-Foi criada a entidade `InventoryItem`, responsável pelo armazenamento dos itens do estoque.
+A ideia principal do projeto é simular uma estrutura de sistema de vendas e estoque, permitindo praticar conceitos de desenvolvimento backend, APIs, bancos de dados, containers e organização de código.
 
-A tabela `inventory_items` possui os seguintes campos:
+---
 
-- `id`: identificador único do item.
-- `name`: nome do produto.
-- `quantity`: quantidade disponível em estoque.
-- `minimum_quantity`: quantidade mínima definida para o estoque.
+## 1. Objetivo do projeto
 
-Foram utilizadas restrições de integridade para impedir valores negativos nos campos `quantity` e `minimum_quantity`.
+O objetivo do projeto é desenvolver, de forma gradual, uma aplicação backend utilizando diferentes tecnologias estudadas durante o curso.
 
-### Índices
+Durante as aulas foram trabalhados conceitos como:
 
-Foi criado um índice no campo `name`:
+- Python;
+- Flask;
+- Django;
+- Django REST Framework;
+- FastAPI;
+- Docker;
+- Docker Compose;
+- PostgreSQL;
+- SQLAlchemy;
+- Alembic;
+- APIs REST;
+- CRUD;
+- validação de dados;
+- transações;
+- migrações de banco;
+- Repository e Service;
+- testes e validações.
 
-`ix_inventory_items_name`
+O projeto foi mantido no mesmo repositório para acompanhar a evolução das atividades.
 
-O objetivo é melhorar a eficiência de consultas que utilizem o nome do item.
+---
 
-### Migrações com Alembic
+## 2. Tecnologias utilizadas
 
-O Alembic foi configurado para controlar a evolução do schema da tabela `inventory_items`.
+As principais tecnologias utilizadas no projeto são:
 
-A primeira migração criou:
+- **Python 3.12**
+- **Django 5.2.6**
+- **Django REST Framework 3.16.1**
+- **FastAPI 0.117.1**
+- **Uvicorn**
+- **SQLAlchemy 2.0.43**
+- **Alembic 1.16.5**
+- **PostgreSQL 16**
+- **Docker**
+- **Docker Compose**
+- **Git e GitHub**
 
-- tabela `inventory_items`;
-- chave primária;
-- restrição para quantidade não negativa;
-- restrição para quantidade mínima não negativa;
-- índice no campo `name`.
+---
 
-A migração foi aplicada com sucesso utilizando:
+## 3. Estrutura geral do projeto
 
-```bash
-alembic upgrade head
+Atualmente, o projeto possui uma estrutura semelhante a esta:
+
+```text
+Docker_Essencial/
+│
+├── app/
+│   ├── aula4api/
+│   │   ├── migrations/
+│   │   ├── admin.py
+│   │   ├── apps.py
+│   │   ├── models.py
+│   │   ├── serializers.py
+│   │   ├── tests.py
+│   │   └── views.py
+│   │
+│   ├── config/
+│   │   ├── settings.py
+│   │   ├── urls.py
+│   │   ├── asgi.py
+│   │   └── wsgi.py
+│   │
+│   ├── inventory/
+│   │   ├── database.py
+│   │   ├── models.py
+│   │   ├── repositories.py
+│   │   ├── services.py
+│   │   ├── schemas.py
+│   │   ├── main.py
+│   │   ├── transaction_test.py
+│   │   └── performance_test.py
+│   │
+│   ├── flask_app_aula3.py
+│   └── manage.py
+│
+├── migrations/
+│   ├── env.py
+│   ├── script.py.mako
+│   └── versions/
+│       └── 2eda063b9f92_create_inventory_items.py
+│
+├── postman/
+│   └── Aula4_DRF_Collection.json
+│
+├── Dockerfile
+├── docker-compose.yml
+├── alembic.ini
+├── requirements.txt
+├── .dockerignore
+├── .gitignore
+├── PROMPTS.md
+└── README.md
