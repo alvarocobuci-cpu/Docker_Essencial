@@ -5,3 +5,5 @@ fastapi==0.117.1
 uvicorn[standard]==0.36.0
 SQLAlchemy==2.0.43
 alembic==1.16.5
+djangorestframework-simplejwt==5.5.1
+django-filter==26.1

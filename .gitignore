@@ -13,3 +13,7 @@ env/
 .pytest_cache/
 
 .DS_Store
+
+.postman/
+postman/collections/
+postman/globals/
