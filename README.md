@@ -56,6 +56,8 @@ O projeto foi mantido no mesmo repositório para acompanhar a evolução das ati
 - **Docker Compose**
 - **Git e GitHub**
 - **Postman**
+- **Redis 7** — cache-aside
+- **redis-py 5.2.1** — integração do Python com Redis
 
 ---
 

@@ -1,6 +1,15 @@
 from fastapi import Depends, FastAPI, HTTPException
 from sqlalchemy.orm import Session
 
+from .cache import (
+    DETAIL_CACHE_TTL,
+    LIST_CACHE_KEY,
+    LIST_CACHE_TTL,
+    get_cached_json,
+    get_cache_metrics,
+    invalidate_inventory_cache,
+    set_cached_json,
+)
 from .database import get_db
 from .schemas import (
     InventoryItemCreate,
@@ -12,8 +21,8 @@ from .services import InventoryService
 
 app = FastAPI(
     title="SynapseShop Inventory API",
-    description="Microsserviço de estoque da Aula 6.",
-    version="2.0.0",
+    description="Microsserviço de estoque com cache-aside.",
+    version="3.0.0",
 )
 
 
@@ -32,14 +41,43 @@ def health():
     }
 
 
+@app.get("/cache/metrics", tags=["Cache"])
+def cache_metrics():
+    return get_cache_metrics()
+
+
 @app.get(
     "/inventory",
     response_model=list[InventoryItemResponse],
     tags=["Inventory"],
 )
 def list_inventory(db: Session = Depends(get_db)):
+    cached_items = get_cached_json(
+        LIST_CACHE_KEY,
+        "inventory_list",
+    )
+
+    if cached_items is not None:
+        return cached_items
+
     service = InventoryService(db)
-    return service.list_items()
+    items = service.list_items()
+
+    result = [
+        InventoryItemResponse.model_validate(item).model_dump(
+            mode="json"
+        )
+        for item in items
+    ]
+
+    set_cached_json(
+        LIST_CACHE_KEY,
+        result,
+        LIST_CACHE_TTL,
+        "inventory_list",
+    )
+
+    return result
 
 
 @app.get(
@@ -51,8 +89,17 @@ def get_inventory(
     item_id: int,
     db: Session = Depends(get_db),
 ):
-    service = InventoryService(db)
+    cache_key = f"inventory:{item_id}"
 
+    cached_item = get_cached_json(
+        cache_key,
+        "inventory_detail",
+    )
+
+    if cached_item is not None:
+        return cached_item
+
+    service = InventoryService(db)
     item = service.get_item(item_id)
 
     if item is None:
@@ -61,10 +108,21 @@ def get_inventory(
             detail="Item não encontrado.",
         )
 
-    return InventoryResponse(
+    response = InventoryResponse(
         item=item,
         available=item.quantity > 0,
     )
+
+    result = response.model_dump(mode="json")
+
+    set_cached_json(
+        cache_key,
+        result,
+        DETAIL_CACHE_TTL,
+        "inventory_detail",
+    )
+
+    return result
 
 
 @app.post(
@@ -79,11 +137,17 @@ def create_inventory(
 ):
     service = InventoryService(db)
 
-    return service.create_item(
+    item = service.create_item(
         name=item_data.name,
         quantity=item_data.quantity,
         minimum_quantity=item_data.minimum_quantity,
     )
+
+    invalidate_inventory_cache(
+        event="InventoryCreated",
+    )
+
+    return item
 
 
 @app.put(
@@ -115,6 +179,11 @@ def update_inventory_quantity(
             detail="Item não encontrado.",
         )
 
+    invalidate_inventory_cache(
+        item_id=item_id,
+        event="InventoryUpdated",
+    )
+
     return item
 
 
@@ -128,7 +197,6 @@ def delete_inventory(
     db: Session = Depends(get_db),
 ):
     service = InventoryService(db)
-
     deleted = service.delete_item(item_id)
 
     if not deleted:
@@ -136,5 +204,10 @@ def delete_inventory(
             status_code=404,
             detail="Item não encontrado.",
         )
+
+    invalidate_inventory_cache(
+        item_id=item_id,
+        event="InventoryDeleted",
+    )
 
     return None
