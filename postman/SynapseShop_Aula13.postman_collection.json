@@ -1,0 +1,1119 @@
+{
+    "info":  {
+                 "_postman_id":  "96daab5d-38bd-4b90-ba69-4a9cb31d9808",
+                 "name":  "SynapseShop - Aula 13 - OpenAPI e Integracao",
+                 "description":  "Colecao de documentacao e exemplos operacionais. Requer ambiente SynapseShop Local. Os tokens sao guardados nas variaveis do ambiente.",
+                 "schema":  "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+             },
+    "auth":  {
+                 "type":  "bearer",
+                 "bearer":  [
+                                {
+                                    "key":  "token",
+                                    "value":  "{{token}}",
+                                    "type":  "string"
+                                }
+                            ]
+             },
+    "item":  [
+                 {
+                     "name":  "01 - Autenticacao",
+                     "item":  [
+                                  {
+                                      "name":  "Login - Admin - Sucesso",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{base_url}}/api/token/",
+                                                      "description":  "Informe credenciais validas de um usuario do grupo admin. Guarda access e refresh no environment.",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\"username\":\"{{username}}\",\"password\":\"{{password}}\"}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               }
+                                                  },
+                                      "response":  [
+
+                                                   ],
+                                      "description":  "Informe credenciais validas de um usuario do grupo admin. Guarda access e refresh no environment.",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\"Login retorna HTTP 200\", function () { pm.response.to.have.status(200); });",
+                                                                                    "if (pm.response.code === 200) {",
+                                                                                    "  const data = pm.response.json();",
+                                                                                    "  pm.environment.set(\"token\", data.access);",
+                                                                                    "  pm.environment.set(\"refresh_token\", data.refresh);",
+                                                                                    "}"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Login - Usuario comum - Sucesso",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{base_url}}/api/token/",
+                                                      "description":  "Informe credenciais validas de um usuario que nao pertence ao grupo admin. Guarda o access em user_token para demonstrar acesso negado.",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\"username\":\"{{user_username}}\",\"password\":\"{{user_password}}\"}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               }
+                                                  },
+                                      "response":  [
+
+                                                   ],
+                                      "description":  "Informe credenciais validas de um usuario que nao pertence ao grupo admin. Guarda o access em user_token para demonstrar acesso negado.",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\"Login do usuario retorna HTTP 200\", function () { pm.response.to.have.status(200); });",
+                                                                                    "if (pm.response.code === 200) {",
+                                                                                    "  const data = pm.response.json();",
+                                                                                    "  pm.environment.set(\"user_token\", data.access);",
+                                                                                    "}"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Login - Senha invalida - Erro 401",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{base_url}}/api/token/",
+                                                      "description":  "Exemplo de falha de autenticacao. Use uma senha invalida.",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\"username\":\"{{username}}\",\"password\":\"senha-incorreta\"}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               }
+                                                  },
+                                      "response":  [
+
+                                                   ],
+                                      "description":  "Exemplo de falha de autenticacao. Use uma senha invalida.",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\"Credenciais invalidas\", function () { pm.response.to.have.status(401); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Renovar token",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{base_url}}/api/token/refresh/",
+                                                      "description":  "Usa o refresh_token salvo no ambiente.",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\"refresh\":\"{{refresh_token}}\"}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               }
+                                                  },
+                                      "response":  [
+
+                                                   ],
+                                      "description":  "Usa o refresh_token salvo no ambiente.",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\"Refresh processado\", function () { pm.expect(pm.response.code).to.be.oneOf([200, 401]); });",
+                                                                                    "if (pm.response.code === 200) { pm.environment.set(\"token\", pm.response.json().access); }"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "02 - Catalogo Django",
+                     "item":  [
+                                  {
+                                      "name":  "Listar itens - Pagina 1",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{base_url}}/api/v1/items/?page=1",
+                                                      "description":  "Lista itens com paginacao. Requer token de administrador.",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  },
+                                      "response":  [
+
+                                                   ],
+                                      "description":  "Lista itens com paginacao. Requer token de administrador.",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\"Lista de itens\", function () { pm.response.to.have.status(200); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Filtrar e ordenar itens",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{base_url}}/api/v1/items/?page=1\u0026category={{category_id}}\u0026search=Notebook\u0026ordering=-price",
+                                                      "description":  "Demonstra os parametros reais: page, category, search e ordering. Para ordem decrescente, use o prefixo menos.",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  },
+                                      "response":  [
+
+                                                   ],
+                                      "description":  "Demonstra os parametros reais: page, category, search e ordering. Para ordem decrescente, use o prefixo menos.",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\"Filtro de itens\", function () { pm.response.to.have.status(200); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Listar categorias",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{base_url}}/api/v1/categories/?page=1",
+                                                      "description":  "Lista categorias paginadas. Requer token de administrador.",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  },
+                                      "response":  [
+
+                                                   ],
+                                      "description":  "Lista categorias paginadas. Requer token de administrador."
+                                  },
+                                  {
+                                      "name":  "Criar categoria",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{base_url}}/api/v1/categories/",
+                                                      "description":  "Cria uma categoria de exemplo e guarda o ID retornado. Se o nome ja existir, escolha outro valor em new_category_name.",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\"name\":\"{{new_category_name}}\"}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  },
+                                      "response":  [
+
+                                                   ],
+                                      "description":  "Cria uma categoria de exemplo e guarda o ID retornado. Se o nome ja existir, escolha outro valor em new_category_name.",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\"Resposta de criacao de categoria\", function () { pm.expect(pm.response.code).to.be.oneOf([201, 400]); });",
+                                                                                    "if (pm.response.code === 201) { pm.environment.set(\"category_id\", String(pm.response.json().id)); }"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Consultar categoria por ID",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{base_url}}/api/v1/categories/{{category_id}}/",
+                                                      "description":  "Consulta a categoria indicada em category_id.",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  },
+                                      "response":  [
+
+                                                   ],
+                                      "description":  "Consulta a categoria indicada em category_id."
+                                  },
+                                  {
+                                      "name":  "Atualizar categoria parcialmente",
+                                      "request":  {
+                                                      "method":  "PATCH",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{base_url}}/api/v1/categories/{{category_id}}/",
+                                                      "description":  "Altera o nome da categoria indicada. Use um nome unico.",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\"name\":\"{{updated_category_name}}\"}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  },
+                                      "response":  [
+
+                                                   ],
+                                      "description":  "Altera o nome da categoria indicada. Use um nome unico."
+                                  },
+                                  {
+                                      "name":  "Criar item - Sucesso",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{base_url}}/api/v1/items/",
+                                                      "description":  "Cria um item de catalogo na categoria indicada por category_id.",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\"name\":\"{{new_item_name}}\",\"description\":\"Item de exemplo da Aula 13\",\"price\":\"49.90\",\"quantity\":10,\"category\":{{category_id}}}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  },
+                                      "response":  [
+
+                                                   ],
+                                      "description":  "Cria um item de catalogo na categoria indicada por category_id.",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\"Criacao de item\", function () { pm.expect(pm.response.code).to.be.oneOf([201, 400]); });",
+                                                                                    "if (pm.response.code === 201) { pm.environment.set(\"item_id\", String(pm.response.json().id)); }"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Criar item com preco negativo - Erro 400",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{base_url}}/api/v1/items/",
+                                                      "description":  "Exemplo de validacao de negocio: o preco nao pode ser negativo.",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\"name\":\"Item invalido\",\"description\":\"Teste de erro\",\"price\":\"-10.00\",\"quantity\":1,\"category\":{{category_id}}}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  },
+                                      "response":  [
+
+                                                   ],
+                                      "description":  "Exemplo de validacao de negocio: o preco nao pode ser negativo.",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\"Preco negativo rejeitado\", function () { pm.response.to.have.status(400); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Consultar item por ID",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{base_url}}/api/v1/items/{{item_id}}/",
+                                                      "description":  "Consulta o item indicado por item_id.",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  },
+                                      "response":  [
+
+                                                   ],
+                                      "description":  "Consulta o item indicado por item_id."
+                                  },
+                                  {
+                                      "name":  "Atualizar item",
+                                      "request":  {
+                                                      "method":  "PUT",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{base_url}}/api/v1/items/{{item_id}}/",
+                                                      "description":  "Atualiza os campos do item. Use um ID existente e uma categoria valida.",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\"name\":\"{{new_item_name}}\",\"description\":\"Item atualizado pela Aula 13\",\"price\":\"59.90\",\"quantity\":12,\"category\":{{category_id}}}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  },
+                                      "response":  [
+
+                                                   ],
+                                      "description":  "Atualiza os campos do item. Use um ID existente e uma categoria valida."
+                                  },
+                                  {
+                                      "name":  "Listar itens sem token - Erro 401",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{base_url}}/api/v1/items/",
+                                                      "description":  "Demonstra a resposta de autenticacao ausente.",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               }
+                                                  },
+                                      "response":  [
+
+                                                   ],
+                                      "description":  "Demonstra a resposta de autenticacao ausente.",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\"Token ausente\", function () { pm.response.to.have.status(401); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Listar itens com usuario comum - Erro 403",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{base_url}}/api/v1/items/",
+                                                      "description":  "Execute Login - Usuario comum primeiro. O usuario nao deve pertencer ao grupo admin.",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "auth":  {
+                                                                   "type":  "bearer",
+                                                                   "bearer":  [
+                                                                                  {
+                                                                                      "key":  "token",
+                                                                                      "value":  "{{user_token}}",
+                                                                                      "type":  "string"
+                                                                                  }
+                                                                              ]
+                                                               }
+                                                  },
+                                      "response":  [
+
+                                                   ],
+                                      "description":  "Execute Login - Usuario comum primeiro. O usuario nao deve pertencer ao grupo admin.",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\"Usuario sem permissao de admin\", function () { pm.response.to.have.status(403); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "03 - Pedidos",
+                     "item":  [
+                                  {
+                                      "name":  "Criar pedido - Sucesso ou duplicado",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Idempotency-Key",
+                                                                         "value":  "{{idempotency_key}}",
+                                                                         "type":  "text"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Trace-Id",
+                                                                         "value":  "{{trace_id}}",
+                                                                         "type":  "text"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{base_url}}/api/v1/pedidos/",
+                                                      "description":  "Requer JWT e Idempotency-Key. A chave reutilizada com o mesmo payload pode retornar duplicate=true. X-Trace-Id e documentado como convencao, mas ainda nao e processado pelo codigo.",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\"item_id\":{{item_id}},\"quantidade\":2}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  },
+                                      "response":  [
+
+                                                   ],
+                                      "description":  "Requer JWT e Idempotency-Key. A chave reutilizada com o mesmo payload pode retornar duplicate=true. X-Trace-Id e documentado como convencao, mas ainda nao e processado pelo codigo.",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\"Pedido aceito\", function () { pm.response.to.have.status(202); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Criar pedido sem Idempotency-Key - Erro 400",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{base_url}}/api/v1/pedidos/",
+                                                      "description":  "Exemplo de validacao: o codigo exige Idempotency-Key.",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\"item_id\":{{item_id}},\"quantidade\":1}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  },
+                                      "response":  [
+
+                                                   ],
+                                      "description":  "Exemplo de validacao: o codigo exige Idempotency-Key.",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\"Chave idempotente obrigatoria\", function () { pm.response.to.have.status(400); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "04 - Inventario FastAPI",
+                     "item":  [
+                                  {
+                                      "name":  "Health - Sucesso",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{inventory_url}}/health",
+                                                      "description":  "Verifica a saude do servico de inventario.",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               }
+                                                  },
+                                      "response":  [
+
+                                                   ],
+                                      "description":  "Verifica a saude do servico de inventario.",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\"Inventario saudavel\", function () { pm.response.to.have.status(200); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Metricas do cache",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{inventory_url}}/cache/metrics",
+                                                      "description":  "Consulta metricas do cache-aside.",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               }
+                                                  },
+                                      "response":  [
+
+                                                   ],
+                                      "description":  "Consulta metricas do cache-aside."
+                                  },
+                                  {
+                                      "name":  "Listar inventario",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{inventory_url}}/inventory",
+                                                      "description":  "Retorna a lista completa do inventario. Esta rota nao implementa paginacao.",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               }
+                                                  },
+                                      "response":  [
+
+                                                   ],
+                                      "description":  "Retorna a lista completa do inventario. Esta rota nao implementa paginacao."
+                                  },
+                                  {
+                                      "name":  "Criar registro de inventario",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{inventory_url}}/inventory",
+                                                      "description":  "Cria um registro no inventario e guarda seu ID.",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\"name\":\"{{inventory_item_name}}\",\"quantity\":15,\"minimum_quantity\":3}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               }
+                                                  },
+                                      "response":  [
+
+                                                   ],
+                                      "description":  "Cria um registro no inventario e guarda seu ID.",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\"Resposta de criacao\", function () { pm.expect(pm.response.code).to.be.oneOf([201, 422]); });",
+                                                                                    "if (pm.response.code === 201) { pm.environment.set(\"inventory_item_id\", String(pm.response.json().id)); }"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Consultar item de inventario",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{inventory_url}}/inventory/{{inventory_item_id}}",
+                                                      "description":  "Consulta o registro indicado por inventory_item_id.",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               }
+                                                  },
+                                      "response":  [
+
+                                                   ],
+                                      "description":  "Consulta o registro indicado por inventory_item_id."
+                                  },
+                                  {
+                                      "name":  "Atualizar quantidade",
+                                      "request":  {
+                                                      "method":  "PUT",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{inventory_url}}/inventory/{{inventory_item_id}}/quantity?quantity=12",
+                                                      "description":  "Define a nova quantidade em estoque.",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               }
+                                                  },
+                                      "response":  [
+
+                                                   ],
+                                      "description":  "Define a nova quantidade em estoque."
+                                  },
+                                  {
+                                      "name":  "Atualizar quantidade negativa - Erro 400",
+                                      "request":  {
+                                                      "method":  "PUT",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{inventory_url}}/inventory/{{inventory_item_id}}/quantity?quantity=-1",
+                                                      "description":  "Demonstra a validacao para quantidades negativas.",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               }
+                                                  },
+                                      "response":  [
+
+                                                   ],
+                                      "description":  "Demonstra a validacao para quantidades negativas.",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\"Quantidade negativa rejeitada\", function () { pm.response.to.have.status(400); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Consultar item inexistente - Erro 404",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{inventory_url}}/inventory/999999",
+                                                      "description":  "Exemplo de recurso nao encontrado.",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               }
+                                                  },
+                                      "response":  [
+
+                                                   ],
+                                      "description":  "Exemplo de recurso nao encontrado.",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\"Item inexistente\", function () { pm.response.to.have.status(404); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Excluir item de inventario - Destrutivo",
+                                      "request":  {
+                                                      "method":  "DELETE",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{inventory_url}}/inventory/{{inventory_item_id}}",
+                                                      "description":  "Exclui o registro indicado. Execute apenas em dados de teste.",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               }
+                                                  },
+                                      "response":  [
+
+                                                   ],
+                                      "description":  "Exclui o registro indicado. Execute apenas em dados de teste."
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "05 - Limpeza (Destrutivo - executar manualmente)",
+                     "item":  [
+                                  {
+                                      "name":  "Excluir item - Destrutivo",
+                                      "request":  {
+                                                      "method":  "DELETE",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{base_url}}/api/v1/items/{{item_id}}/",
+                                                      "description":  "Exclui o item indicado. Execute apenas se quiser remover esse registro de teste.",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  },
+                                      "response":  [
+
+                                                   ],
+                                      "description":  "Exclui o item indicado. Execute apenas se quiser remover esse registro de teste."
+                                  },
+                                  {
+                                      "name":  "Excluir categoria - Destrutivo",
+                                      "request":  {
+                                                      "method":  "DELETE",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{base_url}}/api/v1/categories/{{category_id}}/",
+                                                      "description":  "ATENCAO: a exclusao de uma categoria pode excluir seus itens associados, conforme o relacionamento do banco. Execute apenas em dados de teste.",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  },
+                                      "response":  [
+
+                                                   ],
+                                      "description":  "ATENCAO: a exclusao de uma categoria pode excluir seus itens associados, conforme o relacionamento do banco. Execute apenas em dados de teste."
+                                  }
+                              ]
+                 }
+             ]
+}

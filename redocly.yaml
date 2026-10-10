@@ -1,0 +1,16 @@
+extends:
+  - recommended
+
+rules:
+  # As rotas Django existentes usam barras finais.
+  no-path-trailing-slash: off
+
+  # URLs localhost sao intencionais no ambiente local Docker.
+  no-server-example.com: off
+
+  # O projeto ainda nao declarou uma licenca de software.
+  info-license: off
+  info-license-strict: off
+
+  # Alguns endpoints de saude e metricas nao definem respostas 4xx.
+  operation-4xx-response: off

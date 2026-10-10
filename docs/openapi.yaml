@@ -1,0 +1,988 @@
+openapi: 3.0.3
+info:
+  title: SynapseShop API
+  version: 3.0.0
+  description: |
+    Contrato combinado das APIs Django REST Framework e FastAPI do SynapseShop.
+    A API Django gerencia categorias, itens e pedidos. A API FastAPI gerencia
+    o inventario. As respostas de erro refletem os formatos atuais dos servicos;
+    a aplicacao ainda nao emite respostas RFC 7807 application/problem+json.
+servers:
+  - url: http://localhost:8000
+    description: Django REST Framework
+tags:
+  - name: Authentication
+    description: Obtencao e renovacao de tokens JWT
+  - name: Categories
+    description: Categorias do catalogo (acesso de admin)
+  - name: Items
+    description: Itens do catalogo (acesso de admin)
+  - name: Orders
+    description: Criacao idempotente de pedidos
+  - name: Inventory
+    description: Consulta e manutencao do estoque
+  - name: Health
+    description: Estado dos servicos
+  - name: Cache
+    description: Metricas do cache de inventario
+
+paths:
+  /api/token/:
+    post:
+      tags: [Authentication]
+      summary: Obter tokens JWT
+      operationId: obtainJwtToken
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRequest'
+            example:
+              username: admin
+              password: change-me
+      responses:
+        '200':
+          description: Tokens de acesso e renovacao
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPair'
+              example:
+                refresh: refresh-token-example
+                access: access-token-example
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /api/token/refresh/:
+    post:
+      tags: [Authentication]
+      summary: Renovar token de acesso
+      operationId: refreshJwtToken
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+            example:
+              refresh: refresh-token-example
+      responses:
+        '200':
+          description: Novo token de acesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenAccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /api/v1/categories/:
+    get:
+      tags: [Categories]
+      summary: Listar categorias
+      operationId: listCategories
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+      responses:
+        '200':
+          description: Pagina de categorias
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCategories'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    post:
+      tags: [Categories]
+      summary: Criar categoria
+      operationId: createCategory
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryCreate'
+            example:
+              name: Informatica
+      responses:
+        '201':
+          description: Categoria criada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /api/v1/categories/{id}/:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    get:
+      tags: [Categories]
+      summary: Consultar categoria
+      operationId: getCategory
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Categoria encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Categories]
+      summary: Atualizar categoria
+      operationId: updateCategory
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryCreate'
+      responses:
+        '200':
+          description: Categoria atualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Categories]
+      summary: Atualizar parcialmente categoria
+      operationId: patchCategory
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryPatch'
+      responses:
+        '200':
+          description: Categoria atualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Categories]
+      summary: Excluir categoria
+      operationId: deleteCategory
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Categoria excluida
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/items/:
+    get:
+      tags: [Items]
+      summary: Listar e filtrar itens
+      operationId: listItems
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/CategoryFilter'
+        - $ref: '#/components/parameters/Search'
+        - $ref: '#/components/parameters/Ordering'
+      responses:
+        '200':
+          description: Pagina de itens
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedItems'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    post:
+      tags: [Items]
+      summary: Criar item
+      operationId: createItem
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ItemWrite'
+            example:
+              name: Notebook
+              description: Notebook para uso geral
+              price: '3499.90'
+              quantity: 8
+              category: 1
+      responses:
+        '201':
+          description: Item criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /api/v1/items/{id}/:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    get:
+      tags: [Items]
+      summary: Consultar item
+      operationId: getItem
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Item encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Items]
+      summary: Atualizar item
+      operationId: updateItem
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ItemWrite'
+      responses:
+        '200':
+          description: Item atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Items]
+      summary: Atualizar parcialmente item
+      operationId: patchItem
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ItemPatch'
+      responses:
+        '200':
+          description: Item atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Items]
+      summary: Excluir item
+      operationId: deleteItem
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Item excluido
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/pedidos/:
+    post:
+      tags: [Orders]
+      summary: Enfileirar pedido de forma idempotente
+      description: |
+        Requer JWT e Idempotency-Key. A criacao publica um evento PedidoCriado.
+        Uma chave repetida com o mesmo conteudo pode retornar duplicate=true.
+        Uma chave reutilizada com conteudo diferente pode retornar 409.
+      operationId: createPedido
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/TraceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PedidoCreate'
+            example:
+              item_id: 1
+              quantidade: 2
+      responses:
+        '202':
+          description: Pedido enfileirado ou chave idempotente ja registrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PedidoAccepted'
+              examples:
+                created:
+                  summary: Pedido publicado
+                  value:
+                    pedido_id: 3d36d75c-c150-4653-a7c6-3dfb3401b000
+                    status: ENFILEIRADO
+                    event: PedidoCriado
+                    topic: pedidos.criados
+                    partition: 0
+                    offset: 12
+                    duplicate: false
+                duplicate:
+                  summary: Pedido duplicado
+                  value:
+                    pedido_id: 3d36d75c-c150-4653-a7c6-3dfb3401b000
+                    status: publishing
+                    duplicate: true
+                    detail: Esta chave de idempotencia ja foi registrada.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /:
+    get:
+      tags: [Health]
+      servers:
+        - url: http://localhost:8001
+      summary: Informacao do servico de inventario
+      operationId: inventoryRoot
+      security: []
+      responses:
+        '200':
+          description: Servico online
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  service:
+                    type: string
+                    example: inventory
+                  status:
+                    type: string
+                    example: online
+
+  /health:
+    get:
+      tags: [Health]
+      servers:
+        - url: http://localhost:8001
+      summary: Verificar saude da API de inventario
+      operationId: inventoryHealth
+      security: []
+      responses:
+        '200':
+          description: Servico saudavel
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+
+  /cache/metrics:
+    get:
+      tags: [Cache]
+      servers:
+        - url: http://localhost:8001
+      summary: Consultar metricas de cache
+      operationId: inventoryCacheMetrics
+      security: []
+      responses:
+        '200':
+          description: Metricas retornadas pelo servico
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /inventory:
+    get:
+      tags: [Inventory]
+      servers:
+        - url: http://localhost:8001
+      summary: Listar estoque
+      description: Retorna a lista completa. Este endpoint nao implementa paginacao, filtros ou ordenacao.
+      operationId: listInventory
+      security: []
+      responses:
+        '200':
+          description: Lista de itens de inventario
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InventoryItem'
+    post:
+      tags: [Inventory]
+      servers:
+        - url: http://localhost:8001
+      summary: Criar registro de inventario
+      operationId: createInventory
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InventoryItemCreate'
+            example:
+              name: Teclado
+              quantity: 15
+              minimum_quantity: 3
+      responses:
+        '201':
+          description: Registro criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryItem'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /inventory/{item_id}:
+    parameters:
+      - name: item_id
+        in: path
+        required: true
+        description: Identificador numerico do registro
+        schema:
+          type: integer
+          minimum: 1
+    get:
+      tags: [Inventory]
+      servers:
+        - url: http://localhost:8001
+      summary: Consultar item de inventario
+      operationId: getInventoryItem
+      security: []
+      responses:
+        '200':
+          description: Item e indicador de disponibilidade
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [Inventory]
+      servers:
+        - url: http://localhost:8001
+      summary: Excluir item de inventario
+      operationId: deleteInventoryItem
+      security: []
+      responses:
+        '204':
+          description: Item excluido sem corpo de resposta
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /inventory/{item_id}/quantity:
+    put:
+      tags: [Inventory]
+      servers:
+        - url: http://localhost:8001
+      summary: Atualizar quantidade em estoque
+      operationId: updateInventoryQuantity
+      security: []
+      parameters:
+        - name: item_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - name: quantity
+          in: query
+          required: true
+          description: Quantidade desejada. Valores negativos retornam HTTP 400.
+          schema:
+            type: integer
+          example: 12
+      responses:
+        '200':
+          description: Quantidade atualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Informe o access token JWT retornado por /api/token/.
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      required: false
+      description: Numero da pagina; tamanho padrao 10. Os parametros limit e nextCursor ainda nao sao suportados.
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    CategoryFilter:
+      name: category
+      in: query
+      required: false
+      description: Filtrar pelo identificador da categoria.
+      schema:
+        type: integer
+    Search:
+      name: search
+      in: query
+      required: false
+      description: Buscar por nome ou descricao do item.
+      schema:
+        type: string
+    Ordering:
+      name: ordering
+      in: query
+      required: false
+      description: Ordenar por campo usando ordering. O alias sort=createdAt:desc ainda nao e suportado.
+      schema:
+        type: string
+        enum: [id, name, price, quantity, -id, -name, -price, -quantity]
+      example: -price
+    ResourceId:
+      name: id
+      in: path
+      required: true
+      description: Identificador do recurso.
+      schema:
+        type: integer
+        minimum: 1
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Chave exigida na criacao de pedidos para detectar repeticoes.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 255
+      example: pedido-cliente-123-2026-10-10
+    TraceId:
+      name: X-Trace-Id
+      in: header
+      required: false
+      description: Convencao reservada para correlacao. A implementacao atual nao le nem propaga este cabecalho.
+      schema:
+        type: string
+      example: 4bf92f3577b34da6a3ce929d0e0e4736
+
+  schemas:
+    ErrorSchema:
+      type: object
+      description: |
+        Descreve os formatos de erro atualmente retornados pelos servicos.
+        O DRF pode retornar detail ou erros por campo; o FastAPI pode retornar
+        detail como texto ou lista de erros de validacao. Nao e uma resposta
+        RFC 7807 application/problem+json.
+      properties:
+        detail:
+          description: Mensagem ou detalhes do erro.
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: object
+                additionalProperties: true
+            - type: object
+              additionalProperties: true
+        code:
+          type: string
+      additionalProperties: true
+      example:
+        detail: Item nao encontrado.
+
+    TokenRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          example: admin
+        password:
+          type: string
+          format: password
+          example: change-me
+
+    TokenPair:
+      type: object
+      required: [refresh, access]
+      properties:
+        refresh:
+          type: string
+        access:
+          type: string
+
+    TokenRefreshRequest:
+      type: object
+      required: [refresh]
+      properties:
+        refresh:
+          type: string
+
+    TokenAccess:
+      type: object
+      required: [access]
+      properties:
+        access:
+          type: string
+
+    CategoryCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 100
+          example: Informatica
+
+    CategoryPatch:
+      type: object
+      description: Campos opcionais para atualizacao parcial de categoria.
+      properties:
+        name:
+          type: string
+          maxLength: 100
+    Category:
+      allOf:
+        - $ref: '#/components/schemas/CategoryCreate'
+        - type: object
+          required: [id]
+          properties:
+            id:
+              type: integer
+              readOnly: true
+
+    PaginatedCategories:
+      type: object
+      required: [count, next, previous, results]
+      properties:
+        count:
+          type: integer
+        next:
+          type: string
+          nullable: true
+        previous:
+          type: string
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Category'
+
+    ItemWrite:
+      type: object
+      required: [name, price, category]
+      properties:
+        name:
+          type: string
+          maxLength: 150
+          example: Notebook
+        description:
+          type: string
+          example: Notebook para uso geral
+        price:
+          type: string
+          pattern: '^[0-9]+(\.[0-9]{1,2})?$'
+          example: '3499.90'
+        quantity:
+          type: integer
+          minimum: 0
+          default: 0
+        category:
+          type: integer
+          description: Identificador de uma categoria existente
+          example: 1
+
+    ItemPatch:
+      type: object
+      description: Campos opcionais para atualizacao parcial de item.
+      properties:
+        name:
+          type: string
+          maxLength: 150
+        description:
+          type: string
+        price:
+          type: string
+          pattern: '^[0-9]+(\.[0-9]{1,2})?$'
+        quantity:
+          type: integer
+          minimum: 0
+        category:
+          type: integer
+    Item:
+      allOf:
+        - $ref: '#/components/schemas/ItemWrite'
+        - type: object
+          required: [id]
+          properties:
+            id:
+              type: integer
+              readOnly: true
+
+    PaginatedItems:
+      type: object
+      required: [count, next, previous, results]
+      properties:
+        count:
+          type: integer
+        next:
+          type: string
+          nullable: true
+        previous:
+          type: string
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Item'
+
+    PedidoCreate:
+      type: object
+      required: [item_id, quantidade]
+      properties:
+        item_id:
+          type: integer
+          minimum: 1
+          description: Identificador de um item existente
+        quantidade:
+          type: integer
+          minimum: 1
+
+    PedidoAccepted:
+      type: object
+      required: [pedido_id, duplicate]
+      properties:
+        pedido_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          example: ENFILEIRADO
+        event:
+          type: string
+          example: PedidoCriado
+        topic:
+          type: string
+        partition:
+          type: integer
+        offset:
+          type: integer
+        duplicate:
+          type: boolean
+        detail:
+          type: string
+
+    InventoryItemCreate:
+      type: object
+      required: [name, quantity, minimum_quantity]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 150
+          example: Teclado
+        quantity:
+          type: integer
+          minimum: 0
+          example: 15
+        minimum_quantity:
+          type: integer
+          minimum: 0
+          example: 3
+
+    InventoryItem:
+      allOf:
+        - $ref: '#/components/schemas/InventoryItemCreate'
+        - type: object
+          required: [id]
+          properties:
+            id:
+              type: integer
+              readOnly: true
+
+    InventoryDetail:
+      type: object
+      required: [item, available]
+      properties:
+        item:
+          $ref: '#/components/schemas/InventoryItem'
+        available:
+          type: boolean
+          description: True quando quantity for maior que zero.
+
+  responses:
+    BadRequest:
+      description: Pedido invalido ou validacao de negocio falhou.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorSchema'
+    Unauthorized:
+      description: Token ausente, invalido ou credenciais incorretas.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorSchema'
+    Forbidden:
+      description: Usuario autenticado sem permissao de administrador.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorSchema'
+    NotFound:
+      description: Recurso nao encontrado.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorSchema'
+    Conflict:
+      description: Chave de idempotencia reutilizada com outro conteudo.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorSchema'
+    TooManyRequests:
+      description: Limite de requisicoes excedido.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorSchema'
+    ServiceUnavailable:
+      description: Dependencia indisponivel ou falha ao publicar o evento.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorSchema'
+    ValidationError:
+      description: Erro de validacao dos parametros ou do corpo.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorSchema'

@@ -21,6 +21,7 @@ WORKDIR /app
 COPY --from=builder /install /usr/local
 
 COPY app/ ./app/
+COPY docs/ ./docs/
 
 RUN useradd --create-home --shell /bin/bash appuser \
     && chown -R appuser:appuser /app

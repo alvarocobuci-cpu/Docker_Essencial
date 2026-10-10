@@ -231,3 +231,46 @@ Esse resultado nao representa 100% da aplicacao inteira. As views Django, os wor
 ### Pendencias tecnicas
 
 Os rascunhos das melhorias estao em `docs/issues-aula12.md`. Eles ainda precisam ser registrados como issues no GitHub.
+
+## Aula 13 - OpenAPI, Swagger e Postman
+
+### Documentacao local
+
+Com os servicos iniciados por Docker Compose:
+
+- API Django: http://localhost:8000
+- Contrato OpenAPI combinado: http://localhost:8000/openapi.yaml
+- Swagger UI Django: http://localhost:8000/docs/
+- ReDoc Django: http://localhost:8000/redoc/
+- Swagger UI do inventario FastAPI: http://localhost:8001/docs
+- ReDoc do inventario FastAPI: http://localhost:8001/redoc
+- OpenAPI JSON do inventario: http://localhost:8001/openapi.json
+
+### Arquivos da entrega
+
+- `docs/openapi.yaml`: contrato combinado das APIs existentes.
+- `redocly.yaml`: configuracao do lint do contrato.
+- `docs/integrator-checklist.md`: instrucoes para integradores externos.
+- `CHANGELOG.md`: historico de alteracoes.
+- `postman/SynapseShop_Aula13.postman_collection.json`: colecao Postman.
+- `postman/environments/SynapseShop_Local.postman_environment.json`: ambiente local.
+- `PROMPTS.md`: registro do trabalho com apoio de IA.
+
+### Validar a especificacao
+
+```powershell
+npx --yes @redocly/cli lint ./docs/openapi.yaml
+```
+
+### Importar a colecao Postman
+
+Importe a colecao e o ambiente indicados acima, escolha `SynapseShop - Local` e substitua os valores de credenciais de exemplo pelas credenciais locais. Os tokens sao guardados no ambiente apos o login.
+
+### Limites conhecidos do contrato
+
+Os parametros limit, nextCursor, filtro status e sort=createdAt:desc ainda nao sao suportados pelas rotas atuais. Consulte docs/integrator-checklist.md para as convencoes existentes e as diferencas.
+
+A API de inventario ainda nao possui paginacao, filtros, ordenacao ou autenticacao JWT.
+O cabecalho `X-Trace-Id` esta documentado como convencao futura, mas ainda nao e processado pela aplicacao.
+A resposta de erro atual nao e padronizada integralmente como RFC 7807 `application/problem+json`.
+Essas diferencas estao descritas em `docs/integrator-checklist.md`.
