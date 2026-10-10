@@ -21,6 +21,8 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
 
 
   worker:
@@ -47,6 +49,8 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
 
     command: ["python", "app/aula4api/worker.py"]
     restart: unless-stopped
@@ -129,5 +133,14 @@ services:
       retries: 10
       start_period: 20s
 
+  kafka-init:
+    image: apache/kafka:4.2.2
+    depends_on:
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ./scripts/kafka-init.sh:/scripts/kafka-init.sh:ro
+    entrypoint: ["/bin/sh", "/scripts/kafka-init.sh"]
+    restart: "no"
 volumes:
   postgres_data:

@@ -123,3 +123,15 @@ O projeto utiliza Apache Kafka para separar o recebimento dos pedidos do seu pro
 O worker valida os eventos, aplica controle de idempotência e realiza novas tentativas com espera progressiva (backoff). Quando uma mensagem falha após três tentativas, ela é encaminhada para o tópico `pedidos.criado.dlq`, destinado às mensagens que não puderam ser processadas.
 
 A escolha do Kafka permite manter produtores e consumidores desacoplados, armazenar eventos em tópicos e acompanhar o processamento por meio de partições e offsets. O ambiente atual utiliza um único broker em modo KRaft, adequado para desenvolvimento local, mas sem alta disponibilidade.
+
+## Configuração do Kafka
+
+O serviço `kafka-init` executa o script `scripts/kafka-init.sh` depois que o broker fica saudável. O script configura os tópicos de forma repetível, sem recriar tópicos existentes nem reduzir suas partições.
+
+- `pedidos.criado`: três partições e retenção de três dias.
+- `pedidos.criado.dlq`: uma partição e retenção de 30 dias.
+- Grupo de consumidores: `pedidos-worker-v1`.
+
+As partições permitem distribuir o processamento entre consumidores do mesmo grupo. Os offsets registram a posição de leitura, enquanto o `LAG` indica quantas mensagens ainda faltam consumir. No teste local, duas instâncias do worker processaram mensagens das três partições e o atraso chegou a zero.
+
+O ambiente de desenvolvimento utiliza um único broker e fator de replicação 1. Portanto, ele demonstra os conceitos de particionamento e consumo concorrente, mas não oferece alta disponibilidade.
