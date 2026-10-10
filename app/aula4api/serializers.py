@@ -56,3 +56,14 @@ class ItemSerializer(serializers.ModelSerializer):
             )
 
         return value
+
+
+class PedidoCreateSerializer(serializers.Serializer):
+    item_id = serializers.PrimaryKeyRelatedField(
+        queryset=Item.objects.all(),
+        source="item",
+    )
+
+    quantidade = serializers.IntegerField(
+        min_value=1,
+    )

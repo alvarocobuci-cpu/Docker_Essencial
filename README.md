@@ -116,3 +116,10 @@ Docker_Essencial/
 ├── .gitignore
 ├── PROMPTS.md
 └── README.md
+## Mensageria assíncrona
+
+O projeto utiliza Apache Kafka para separar o recebimento dos pedidos do seu processamento em segundo plano. Quando a API recebe uma solicitação em `POST /api/v1/pedidos/`, ela publica o evento `PedidoCriado` no tópico `pedidos.criado`. Um worker independente consome esse evento e registra o pedido no PostgreSQL.
+
+O worker valida os eventos, aplica controle de idempotência e realiza novas tentativas com espera progressiva (backoff). Quando uma mensagem falha após três tentativas, ela é encaminhada para o tópico `pedidos.criado.dlq`, destinado às mensagens que não puderam ser processadas.
+
+A escolha do Kafka permite manter produtores e consumidores desacoplados, armazenar eventos em tópicos e acompanhar o processamento por meio de partições e offsets. O ambiente atual utiliza um único broker em modo KRaft, adequado para desenvolvimento local, mas sem alta disponibilidade.

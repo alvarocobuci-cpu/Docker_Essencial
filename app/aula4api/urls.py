@@ -1,24 +1,33 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from .views import CategoryViewSet, ItemViewSet
+from .views import (
+    CategoryViewSet,
+    ItemViewSet,
+    create_pedido,
+)
 
 
 router = DefaultRouter()
 
 router.register(
-    r'categories',
+    r"categories",
     CategoryViewSet,
-    basename='category',
+    basename="category",
 )
 
 router.register(
-    r'items',
+    r"items",
     ItemViewSet,
-    basename='item',
+    basename="item",
 )
 
 
 urlpatterns = [
-    path('', include(router.urls)),
+    path(
+        "pedidos/",
+        create_pedido,
+        name="pedido-create",
+    ),
+    path("", include(router.urls)),
 ]
