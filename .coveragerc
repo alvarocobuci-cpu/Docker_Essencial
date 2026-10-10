@@ -1,0 +1,9 @@
+[run]
+omit =
+    */inventory/benchmark.py
+    */inventory/performance_test.py
+    */inventory/transaction_test.py
+
+[report]
+show_missing = True
+fail_under = 85

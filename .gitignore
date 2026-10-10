@@ -17,3 +17,5 @@ env/
 .postman/
 postman/collections/
 postman/globals/
+.coverage
+htmlcov/

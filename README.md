@@ -154,3 +154,80 @@ Os consumidores possuem grupos separados:
 As falhas de processamento possuem retentativas com backoff e topicos de DLQ. Como a entrega e pelo menos uma vez, a persistencia idempotente e importante para lidar com reprocessamentos; publicacoes de eventos podem se repetir em caso de falhas entre a persistencia e a confirmacao do offset.
 
 O teste local confirmou o caminho pedido criado, pagamento aprovado e notificacao registrada no PostgreSQL. O registro temporario de teste e suas chaves relacionadas do Redis foram removidos ao final.
+
+## Aula 12 - Testes automatizados e cobertura
+
+A suite utiliza pytest, pytest-cov, HTTPX e freezegun. Os testes rodam em container e usam SQLite em memoria para testar o microsservico de inventario sem alterar o PostgreSQL de desenvolvimento.
+
+### Estrutura
+
+- `tests/conftest.py`: fixtures compartilhadas, banco efemero, cliente HTTP, FakeRedis e relogio fixo.
+- `tests/unit/`: schemas, servicos, cache, sessao do banco, idempotencia e contratos de eventos.
+- `tests/integration/`: testes HTTP de criacao, consulta, atualizacao, exclusao e erros.
+- `pytest.ini`: descoberta dos testes e marcadores unit e integration.
+- `.coveragerc`: escopo de cobertura e limite minimo.
+
+### Convencoes
+
+Mocks e fakes isolam dependencias externas. O SQLite em memoria e recriado para cada teste. Os testes de integracao usam TestClient e conferem os status HTTP e os efeitos no banco. A fixture frozen_time fixa o horario para testes deterministas.
+
+### Executar no Windows com PowerShell e Docker
+
+Reconstruir a imagem apos mudancas nas dependencias:
+
+```powershell
+docker compose build api
+```
+
+Executar os testes unitarios:
+
+```powershell
+$appPath = (Resolve-Path ".\app").Path
+$testsPath = (Resolve-Path ".\tests").Path
+$pytestConfigPath = (Resolve-Path ".\pytest.ini").Path
+$coveragePath = (Resolve-Path ".\.coveragerc").Path
+
+docker compose run --rm `
+    -v "${appPath}:/app/app" `
+    -v "${testsPath}:/app/tests" `
+    -v "${pytestConfigPath}:/app/pytest.ini:ro" `
+    -v "${coveragePath}:/app/.coveragerc:ro" `
+    api pytest -v -m unit tests
+```
+
+Executar os testes de integracao:
+
+```powershell
+docker compose run --rm `
+    -v "${appPath}:/app/app" `
+    -v "${testsPath}:/app/tests" `
+    -v "${pytestConfigPath}:/app/pytest.ini:ro" `
+    -v "${coveragePath}:/app/.coveragerc:ro" `
+    api pytest -v -m integration tests
+```
+
+Executar a suite completa com cobertura:
+
+```powershell
+docker compose run --rm `
+    -v "${appPath}:/app/app" `
+    -v "${testsPath}:/app/tests" `
+    -v "${pytestConfigPath}:/app/pytest.ini:ro" `
+    -v "${coveragePath}:/app/.coveragerc:ro" `
+    api pytest -v `
+        --cov=inventory `
+        --cov=aula4api.idempotency `
+        --cov=aula4api.event_contracts `
+        --cov-config=/app/.coveragerc `
+        --cov-report=term-missing tests
+```
+
+### Meta de cobertura
+
+A meta minima e 85% para os modulos medidos: inventory, aula4api.idempotency e aula4api.event_contracts. A ultima execucao apresentou 52 testes aprovados e 100% de cobertura nesse escopo.
+
+Esse resultado nao representa 100% da aplicacao inteira. As views Django, os workers e outros modulos ainda precisam de testes especificos. Scripts manuais de benchmark e experimentacao ficam fora do relatorio da API.
+
+### Pendencias tecnicas
+
+Os rascunhos das melhorias estao em `docs/issues-aula12.md`. Eles ainda precisam ser registrados como issues no GitHub.
