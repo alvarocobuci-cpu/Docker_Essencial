@@ -4,6 +4,8 @@ import logging
 import os
 import sys
 import time
+import uuid
+from datetime import datetime, timezone
 from decimal import Decimal
 
 import redis
@@ -21,7 +23,7 @@ import django
 
 django.setup()
 
-from aula4api.event_contracts import PedidoCriado
+from aula4api.event_contracts import PagamentoSolicitado, PedidoCriado
 from aula4api.models import Item, Pedido
 
 
@@ -38,6 +40,7 @@ KAFKA_SERVERS = os.getenv(
 )
 
 MAIN_TOPIC = "pedidos.criado"
+PAYMENT_REQUEST_TOPIC = "pagamentos.solicitados"
 DLQ_TOPIC = "pedidos.criado.dlq"
 CONSUMER_GROUP = "pedidos-worker-v1"
 
@@ -330,6 +333,31 @@ def main():
                         )
 
                         outcome = persist_pedido(event)
+
+                        payment_event = PagamentoSolicitado(
+                            event_id=uuid.uuid5(
+                                uuid.NAMESPACE_URL,
+                                f"PagamentoSolicitado:{event.pedido_id}",
+                            ),
+                            occurred_at=event.occurred_at,
+                            pedido_id=event.pedido_id,
+                            valor=event.valor_total,
+                            idempotency_key=event.idempotency_key,
+                        )
+
+                        payment_metadata = producer.send(
+                            PAYMENT_REQUEST_TOPIC,
+                            key=str(event.pedido_id),
+                            value=payment_event.model_dump(mode="json"),
+                        ).get(timeout=15)
+
+                        log_event(
+                            "payment_requested_published",
+                            pedido_id=str(event.pedido_id),
+                            topic=payment_metadata.topic,
+                            partition=payment_metadata.partition,
+                            offset=payment_metadata.offset,
+                        )
 
                         duration_ms = round(
                             (time.perf_counter() - started) * 1000,

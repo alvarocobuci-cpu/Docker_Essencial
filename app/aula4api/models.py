@@ -28,6 +28,8 @@ class Item(models.Model):
 class Pedido(models.Model):
     class Status(models.TextChoices):
         CRIADO = "CRIADO", "Criado"
+        PAGO = "PAGO", "Pago"
+        NOTIFICADO = "NOTIFICADO", "Notificado"
 
     id = models.UUIDField(
         primary_key=True,
@@ -68,3 +70,76 @@ class Pedido(models.Model):
 
     def __str__(self):
         return f"Pedido {self.id} - {self.status}"
+
+
+class Pagamento(models.Model):
+    class Status(models.TextChoices):
+        APROVADO = "APROVADO", "Aprovado"
+        RECUSADO = "RECUSADO", "Recusado"
+
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+    )
+
+    pedido = models.OneToOneField(
+        Pedido,
+        on_delete=models.CASCADE,
+        related_name="pagamento",
+    )
+
+    valor = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+    )
+
+    referencia_simulada = models.CharField(
+        max_length=64,
+        unique=True,
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Pagamento {self.id} - {self.status}"
+
+
+class Notificacao(models.Model):
+    class Status(models.TextChoices):
+        ENVIADA = "ENVIADA", "Enviada"
+
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+    )
+
+    pedido = models.OneToOneField(
+        Pedido,
+        on_delete=models.CASCADE,
+        related_name="notificacao",
+    )
+
+    canal = models.CharField(
+        max_length=20,
+        default="INTERNO",
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.ENVIADA,
+    )
+
+    mensagem = models.TextField()
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Notificacao do pedido {self.pedido_id} - {self.status}"

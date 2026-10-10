@@ -27,6 +27,12 @@ fi
 
 /opt/kafka/bin/kafka-configs.sh --bootstrap-server "$BOOTSTRAP" --entity-type topics --entity-name pedidos.criado.dlq --alter --add-config retention.ms=2592000000
 
+# Topicos do fluxo de pagamento e notificacao.
+/opt/kafka/bin/kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --create --if-not-exists --topic pagamentos.solicitados --partitions 3 --replication-factor 1
+/opt/kafka/bin/kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --create --if-not-exists --topic pagamentos.solicitados.dlq --partitions 3 --replication-factor 1
+/opt/kafka/bin/kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --create --if-not-exists --topic pagamentos.processados --partitions 3 --replication-factor 1
+/opt/kafka/bin/kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --create --if-not-exists --topic pagamentos.processados.dlq --partitions 3 --replication-factor 1
+/opt/kafka/bin/kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --create --if-not-exists --topic notificacoes.enviadas --partitions 3 --replication-factor 1
 echo "Configuracao dos topicos concluida."
 
 /opt/kafka/bin/kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --describe --topic pedidos.criado

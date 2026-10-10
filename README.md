@@ -135,3 +135,22 @@ O serviço `kafka-init` executa o script `scripts/kafka-init.sh` depois que o br
 As partições permitem distribuir o processamento entre consumidores do mesmo grupo. Os offsets registram a posição de leitura, enquanto o `LAG` indica quantas mensagens ainda faltam consumir. No teste local, duas instâncias do worker processaram mensagens das três partições e o atraso chegou a zero.
 
 O ambiente de desenvolvimento utiliza um único broker e fator de replicação 1. Portanto, ele demonstra os conceitos de particionamento e consumo concorrente, mas não oferece alta disponibilidade.
+
+## Aula 11 — Fluxo de pedido, pagamento e notificacao
+
+O fluxo de pedidos foi ampliado com dois consumidores independentes. Depois de persistir o pedido no PostgreSQL, o worker publica `PagamentoSolicitado` no topico `pagamentos.solicitados`.
+
+O `payment-worker` consome a solicitacao, valida o pedido e o valor, registra o pagamento simulado no PostgreSQL e publica `PagamentoProcessado` no topico `pagamentos.processados`. O pagamento desta atividade e simulado e, na implementacao atual, e aprovado automaticamente.
+
+O `notification-worker` consome `PagamentoProcessado`, confere os dados persistidos, registra uma notificacao interna no PostgreSQL e publica `NotificacaoEnviada` no topico `notificacoes.enviadas`.
+
+Os modelos `Pagamento` e `Notificacao` possuem relacionamento um-para-um com `Pedido`, ajudando a impedir registros duplicados para o mesmo pedido. O Redis e usado como cache auxiliar; o PostgreSQL permanece como fonte persistente dos dados.
+
+Os consumidores possuem grupos separados:
+- Pedidos: `pedidos-worker-v1`.
+- Pagamentos: `pagamentos-worker-v1`.
+- Notificacoes: `notificacoes-worker-v1`.
+
+As falhas de processamento possuem retentativas com backoff e topicos de DLQ. Como a entrega e pelo menos uma vez, a persistencia idempotente e importante para lidar com reprocessamentos; publicacoes de eventos podem se repetir em caso de falhas entre a persistencia e a confirmacao do offset.
+
+O teste local confirmou o caminho pedido criado, pagamento aprovado e notificacao registrada no PostgreSQL. O registro temporario de teste e suas chaves relacionadas do Redis foram removidos ao final.

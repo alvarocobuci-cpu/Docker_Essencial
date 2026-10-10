@@ -55,6 +55,58 @@ services:
     command: ["python", "app/aula4api/worker.py"]
     restart: unless-stopped
 
+  payment-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      POSTGRES_DB: appdb
+      POSTGRES_USER: appuser
+      POSTGRES_PASSWORD: apppassword
+      REDIS_URL: redis://redis:6379/0
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+      PEDIDO_IDEMPOTENCY_TTL_SECONDS: 86400
+      PEDIDOS_MAX_ATTEMPTS: 3
+      PEDIDOS_RETRY_BASE_SECONDS: 1
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    command: ["python", "app/aula4api/payment_worker.py"]
+    restart: unless-stopped
+  notification-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      POSTGRES_DB: appdb
+      POSTGRES_USER: appuser
+      POSTGRES_PASSWORD: apppassword
+      REDIS_URL: redis://redis:6379/0
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+      PEDIDO_IDEMPOTENCY_TTL_SECONDS: 86400
+      PEDIDOS_MAX_ATTEMPTS: 3
+      PEDIDOS_RETRY_BASE_SECONDS: 1
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    command: ["python", "app/aula4api/notification_worker.py"]
+    restart: unless-stopped
   inventory:
     build:
       context: .
