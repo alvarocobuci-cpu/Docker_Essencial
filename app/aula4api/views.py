@@ -197,3 +197,70 @@ def create_pedido(request):
         },
         status=status.HTTP_202_ACCEPTED,
     )
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def assist(request):
+    from .serializers import AssistRequestSerializer
+    from .llm_service import (
+        CircuitOpenError,
+        LLMConfigurationError,
+        LLMInvalidPayloadError,
+        LLMProviderError,
+        LLMRateLimitError,
+        LLMServiceError,
+        llm_service,
+    )
+
+    serializer = AssistRequestSerializer(data=request.data)
+
+    if not serializer.is_valid():
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        result = llm_service.generate(
+            **serializer.validated_data
+        )
+        return Response(result, status=status.HTTP_200_OK)
+
+    except LLMRateLimitError:
+        logger.warning("llm_assist_failed error_type=rate_limit")
+        return Response(
+            {"detail": "O provedor de IA esta limitando as requisicoes."},
+            status=status.HTTP_429_TOO_MANY_REQUESTS,
+        )
+
+    except (CircuitOpenError, LLMConfigurationError):
+        logger.warning("llm_assist_failed error_type=unavailable")
+        return Response(
+            {"detail": "O servico de IA esta temporariamente indisponivel."},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    except (LLMProviderError, LLMInvalidPayloadError):
+        logger.warning("llm_assist_failed error_type=provider")
+        return Response(
+            {"detail": "Nao foi possivel obter uma resposta valida do provedor de IA."},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+
+    except LLMServiceError:
+        logger.warning("llm_assist_failed error_type=service")
+        return Response(
+            {"detail": "Ocorreu um erro ao processar a solicitacao de IA."},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+
+    except ValueError:
+        logger.warning("llm_assist_failed error_type=invalid_input")
+        return Response(
+            {
+                "detail": (
+                    "A solicitacao e invalida ou excede "
+                    "os limites permitidos."
+                )
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
