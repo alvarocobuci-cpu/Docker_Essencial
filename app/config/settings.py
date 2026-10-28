@@ -77,13 +77,24 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('POSTGRES_DB', 'appdb'),
-        'USER': os.environ.get('POSTGRES_USER', 'appuser'),
-        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'apppassword'),
-        'HOST': os.environ.get('DB_HOST', 'db'),
-        'PORT': os.environ.get('DB_PORT', '5432'),
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.environ.get("DB_NAME")
+        or os.environ.get("POSTGRES_DB", "appdb"),
+        "USER": os.environ.get("DB_USER")
+        or os.environ.get("POSTGRES_USER", "appuser"),
+        "PASSWORD": os.environ.get("DB_PASSWORD")
+        or os.environ.get("POSTGRES_PASSWORD", ""),
+        "HOST": os.environ.get("DB_HOST", "db"),
+        "PORT": os.environ.get("DB_PORT", "5432"),
+        "CONN_MAX_AGE": int(os.environ.get("DB_CONN_MAX_AGE", "60")),
+        "CONN_HEALTH_CHECKS": True,
+        "OPTIONS": {
+            "sslmode": os.environ.get("DB_SSLMODE", "require"),
+            "connect_timeout": int(
+                os.environ.get("DB_CONNECT_TIMEOUT_SECONDS", "5")
+            ),
+        },
     }
 }
 

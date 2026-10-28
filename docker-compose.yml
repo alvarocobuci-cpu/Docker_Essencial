@@ -6,11 +6,21 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DB_HOST: db
-      DB_PORT: 5432
-      POSTGRES_DB: appdb
-      POSTGRES_USER: appuser
-      POSTGRES_PASSWORD: apppassword
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-appdb}
+      DB_USER: ${DB_USER:-appuser}
+      DB_PASSWORD: ${DB_PASSWORD:-apppassword}
+      DB_SSLMODE: ${DB_SSLMODE:-require}
+      DB_CONNECT_TIMEOUT_SECONDS: ${DB_CONNECT_TIMEOUT_SECONDS:-5}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-10}
+      DB_POOL_TIMEOUT_SECONDS: ${DB_POOL_TIMEOUT_SECONDS:-10}
+      DB_POOL_RECYCLE_SECONDS: ${DB_POOL_RECYCLE_SECONDS:-1800}
+      DB_CONN_MAX_AGE: ${DB_CONN_MAX_AGE:-60}
+      POSTGRES_DB: ${DB_NAME:-appdb}
+      POSTGRES_USER: ${DB_USER:-appuser}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-apppassword}
       REDIS_URL: redis://redis:6379/0
       KAFKA_BOOTSTRAP_SERVERS: kafka:19092
       PEDIDO_IDEMPOTENCY_TTL_SECONDS: 86400
@@ -26,7 +36,6 @@ services:
       LLM_COST_OUTPUT_PER_1K_TOKENS: ${LLM_COST_OUTPUT_PER_1K_TOKENS:-0}
       LLM_MAX_INPUT_CHARS: ${LLM_MAX_INPUT_CHARS:-12000}
     depends_on:
-
       db:
         condition: service_healthy
       redis:
@@ -36,24 +45,31 @@ services:
       kafka-init:
         condition: service_completed_successfully
 
-
   worker:
     build:
       context: .
       dockerfile: Dockerfile
-
     environment:
-      DB_HOST: db
-      DB_PORT: 5432
-      POSTGRES_DB: appdb
-      POSTGRES_USER: appuser
-      POSTGRES_PASSWORD: apppassword
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-appdb}
+      DB_USER: ${DB_USER:-appuser}
+      DB_PASSWORD: ${DB_PASSWORD:-apppassword}
+      DB_SSLMODE: ${DB_SSLMODE:-require}
+      DB_CONNECT_TIMEOUT_SECONDS: ${DB_CONNECT_TIMEOUT_SECONDS:-5}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-10}
+      DB_POOL_TIMEOUT_SECONDS: ${DB_POOL_TIMEOUT_SECONDS:-10}
+      DB_POOL_RECYCLE_SECONDS: ${DB_POOL_RECYCLE_SECONDS:-1800}
+      DB_CONN_MAX_AGE: ${DB_CONN_MAX_AGE:-60}
+      POSTGRES_DB: ${DB_NAME:-appdb}
+      POSTGRES_USER: ${DB_USER:-appuser}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-apppassword}
       REDIS_URL: redis://redis:6379/0
       KAFKA_BOOTSTRAP_SERVERS: kafka:19092
       PEDIDO_IDEMPOTENCY_TTL_SECONDS: 86400
       PEDIDOS_MAX_ATTEMPTS: 3
       PEDIDOS_RETRY_BASE_SECONDS: 1
-
     depends_on:
       db:
         condition: service_healthy
@@ -63,7 +79,6 @@ services:
         condition: service_healthy
       kafka-init:
         condition: service_completed_successfully
-
     command: ["python", "app/aula4api/worker.py"]
     restart: unless-stopped
 
@@ -72,11 +87,21 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      DB_HOST: db
-      DB_PORT: 5432
-      POSTGRES_DB: appdb
-      POSTGRES_USER: appuser
-      POSTGRES_PASSWORD: apppassword
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-appdb}
+      DB_USER: ${DB_USER:-appuser}
+      DB_PASSWORD: ${DB_PASSWORD:-apppassword}
+      DB_SSLMODE: ${DB_SSLMODE:-require}
+      DB_CONNECT_TIMEOUT_SECONDS: ${DB_CONNECT_TIMEOUT_SECONDS:-5}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-10}
+      DB_POOL_TIMEOUT_SECONDS: ${DB_POOL_TIMEOUT_SECONDS:-10}
+      DB_POOL_RECYCLE_SECONDS: ${DB_POOL_RECYCLE_SECONDS:-1800}
+      DB_CONN_MAX_AGE: ${DB_CONN_MAX_AGE:-60}
+      POSTGRES_DB: ${DB_NAME:-appdb}
+      POSTGRES_USER: ${DB_USER:-appuser}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-apppassword}
       REDIS_URL: redis://redis:6379/0
       KAFKA_BOOTSTRAP_SERVERS: kafka:19092
       PEDIDO_IDEMPOTENCY_TTL_SECONDS: 86400
@@ -93,16 +118,27 @@ services:
         condition: service_completed_successfully
     command: ["python", "app/aula4api/payment_worker.py"]
     restart: unless-stopped
+
   notification-worker:
     build:
       context: .
       dockerfile: Dockerfile
     environment:
-      DB_HOST: db
-      DB_PORT: 5432
-      POSTGRES_DB: appdb
-      POSTGRES_USER: appuser
-      POSTGRES_PASSWORD: apppassword
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-appdb}
+      DB_USER: ${DB_USER:-appuser}
+      DB_PASSWORD: ${DB_PASSWORD:-apppassword}
+      DB_SSLMODE: ${DB_SSLMODE:-require}
+      DB_CONNECT_TIMEOUT_SECONDS: ${DB_CONNECT_TIMEOUT_SECONDS:-5}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-10}
+      DB_POOL_TIMEOUT_SECONDS: ${DB_POOL_TIMEOUT_SECONDS:-10}
+      DB_POOL_RECYCLE_SECONDS: ${DB_POOL_RECYCLE_SECONDS:-1800}
+      DB_CONN_MAX_AGE: ${DB_CONN_MAX_AGE:-60}
+      POSTGRES_DB: ${DB_NAME:-appdb}
+      POSTGRES_USER: ${DB_USER:-appuser}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-apppassword}
       REDIS_URL: redis://redis:6379/0
       KAFKA_BOOTSTRAP_SERVERS: kafka:19092
       PEDIDO_IDEMPOTENCY_TTL_SECONDS: 86400
@@ -119,6 +155,7 @@ services:
         condition: service_completed_successfully
     command: ["python", "app/aula4api/notification_worker.py"]
     restart: unless-stopped
+
   inventory:
     build:
       context: .
@@ -126,11 +163,21 @@ services:
     ports:
       - "8001:8001"
     environment:
-      DB_HOST: db
-      DB_PORT: 5432
-      POSTGRES_DB: appdb
-      POSTGRES_USER: appuser
-      POSTGRES_PASSWORD: apppassword
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-appdb}
+      DB_USER: ${DB_USER:-appuser}
+      DB_PASSWORD: ${DB_PASSWORD:-apppassword}
+      DB_SSLMODE: ${DB_SSLMODE:-require}
+      DB_CONNECT_TIMEOUT_SECONDS: ${DB_CONNECT_TIMEOUT_SECONDS:-5}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-10}
+      DB_POOL_TIMEOUT_SECONDS: ${DB_POOL_TIMEOUT_SECONDS:-10}
+      DB_POOL_RECYCLE_SECONDS: ${DB_POOL_RECYCLE_SECONDS:-1800}
+      DB_CONN_MAX_AGE: ${DB_CONN_MAX_AGE:-60}
+      POSTGRES_DB: ${DB_NAME:-appdb}
+      POSTGRES_USER: ${DB_USER:-appuser}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-apppassword}
       REDIS_URL: redis://redis:6379/0
     depends_on:
       db:
@@ -141,18 +188,55 @@ services:
     volumes:
       - .:/workspace
 
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    ports:
+      - "8501:8501"
+    environment:
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-appdb}
+      DB_USER: ${DB_USER:-appuser}
+      DB_PASSWORD: ${DB_PASSWORD:-apppassword}
+      DB_SSLMODE: ${DB_SSLMODE:-require}
+      DB_CONNECT_TIMEOUT_SECONDS: ${DB_CONNECT_TIMEOUT_SECONDS:-5}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-10}
+      DB_POOL_TIMEOUT_SECONDS: ${DB_POOL_TIMEOUT_SECONDS:-10}
+      DB_POOL_RECYCLE_SECONDS: ${DB_POOL_RECYCLE_SECONDS:-1800}
+      POSTGRES_DB: ${DB_NAME:-appdb}
+      POSTGRES_USER: ${DB_USER:-appuser}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-apppassword}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
   db:
     image: postgres:16-alpine
+    entrypoint: ["/bin/sh", "/scripts/postgres-ssl-entrypoint.sh"]
+    command:
+      - postgres
+      - -c
+      - ssl=on
+      - -c
+      - ssl_cert_file=/var/lib/postgresql/tls/server.crt
+      - -c
+      - ssl_key_file=/var/lib/postgresql/tls/server.key
     environment:
-      POSTGRES_DB: appdb
-      POSTGRES_USER: appuser
-      POSTGRES_PASSWORD: apppassword
+      POSTGRES_DB: ${DB_NAME:-appdb}
+      POSTGRES_USER: ${DB_USER:-appuser}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-apppassword}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./certs:/tls-source:ro
+      - ./scripts/postgres-ssl-entrypoint.sh:/scripts/postgres-ssl-entrypoint.sh:ro
     healthcheck:
       test:
         - CMD-SHELL
-        - pg_isready -U appuser -d appdb
+        - pg_isready -U ${DB_USER:-appuser} -d ${DB_NAME:-appdb}
       interval: 5s
       timeout: 5s
       retries: 5
@@ -206,5 +290,6 @@ services:
       - ./scripts/kafka-init.sh:/scripts/kafka-init.sh:ro
     entrypoint: ["/bin/sh", "/scripts/kafka-init.sh"]
     restart: "no"
+
 volumes:
   postgres_data:
