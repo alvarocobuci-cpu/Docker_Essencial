@@ -1,418 +1,453 @@
-# Docker_Essencial — SynapseShop
+# SynapseShop — Docker Essencial
 
 [![CI](https://github.com/alvarocobuci-cpu/Docker_Essencial/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/alvarocobuci-cpu/Docker_Essencial/actions/workflows/ci.yml)
 
-Projeto desenvolvido durante as aulas do curso de Programação em Python do Senac.
+SynapseShop é um sistema de vendas e estoque desenvolvido durante o curso de Programação em Python do Senac. O projeto começou como uma aplicação Flask com Docker e PostgreSQL e evoluiu para uma arquitetura com API Django REST Framework, microsserviço de inventário em FastAPI, mensageria com Apache Kafka, cache com Redis, assistência por IA, dashboards em Streamlit, testes automatizados e pipeline de CI/CD.
 
-O projeto começou como uma aplicação simples utilizando Flask, Docker e PostgreSQL e foi evoluindo ao longo das aulas. Depois foram adicionadas uma API em Django REST Framework, um microsserviço de estoque com FastAPI, persistência com PostgreSQL, SQLAlchemy, migrações com Alembic e autenticação JWT.
-
-A ideia principal é simular uma estrutura de sistema de vendas e estoque, permitindo praticar conceitos de desenvolvimento backend, APIs, bancos de dados, containers, segurança e organização de código.
+O objetivo é simular um backend real de vendas, aplicando na prática conceitos de APIs REST, persistência, transações, idempotência, autenticação JWT, controle de acesso, mensageria assíncrona, observabilidade, segurança, engenharia de prompts e integração contínua.
 
 ---
 
-## 1. Objetivo do projeto
+## Sumário
 
-O objetivo é desenvolver, de forma gradual, uma aplicação backend utilizando as tecnologias estudadas durante o curso.
-
-Durante as aulas foram trabalhados conceitos como:
-
-- Python
-
-- Flask
-
-- Django
-
-- Django REST Framework
-
-- FastAPI
-
-- Docker e Docker Compose
-
-- PostgreSQL
-
-- SQLAlchemy
-
-- Alembic
-
-- APIs REST
-
-- CRUD
-
-- validação de dados
-
-- transações e rollback
-
-- migrações de banco
-
-- Repository e Service
-
-- autenticação JWT
-
-- controle de acesso por papéis
-
-- throttling
-
-- paginação, filtros, busca e ordenação
-
-- testes com Postman
-
-- Git e GitHub
-
-- integração com modelos de linguagem (LLM)
-
-- engenharia de prompts para análise de logs
-
-- redação de dados pessoais e segredos antes do envio
-
-- timeout, retentativas, backoff exponencial e jitter
-
-- circuit breaker para falhas do provedor
-
-- telemetria de chamadas, latência, tokens e custo estimado
-
-O projeto foi mantido no mesmo repositório para acompanhar a evolução das atividades.
+- [Visão geral](#visão-geral)
+- [Arquitetura](#arquitetura)
+- [Funcionalidades](#funcionalidades)
+- [Stack tecnológica](#stack-tecnológica)
+- [Estrutura do projeto](#estrutura-do-projeto)
+- [Como executar](#como-executar)
+- [Serviços e portas](#serviços-e-portas)
+- [Endpoints](#endpoints)
+- [Modelo de dados](#modelo-de-dados)
+- [Configuração e variáveis de ambiente](#configuração-e-variáveis-de-ambiente)
+- [Testes](#testes)
+- [CI/CD](#cicd)
+- [Segurança e privacidade](#segurança-e-privacidade)
+- [Limitações conhecidas](#limitações-conhecidas)
+- [Histórico do projeto](#histórico-do-projeto)
+- [Documentação relacionada](#documentação-relacionada)
 
 ---
 
-## 2. Tecnologias utilizadas
+## Visão geral
 
-- **Python 3.12**
+O SynapseShop cobre o ciclo básico de um pedido:
 
-- **Django 5.2.6**
+1. Um cliente autenticado cria um pedido informando item e quantidade, com uma chave de idempotência.
+2. A API publica o evento `PedidoCriado` no Kafka e responde imediatamente com HTTP 202.
+3. Um worker consome o evento e persiste o pedido no PostgreSQL.
+4. O worker solicita o pagamento, que é processado por outro consumidor e registrado no banco.
+5. Um terceiro consumidor registra a notificação do pedido e publica o evento final.
 
-- **Django REST Framework 3.16.1**
+Além do fluxo de pedidos, o projeto oferece:
 
-- **djangorestframework-simplejwt 5.5.1**
-
-- **django-filter 26.1**
-
-- **FastAPI 0.117.1**
-
-- **Uvicorn 0.36.0**
-
-- **SQLAlchemy 2.0.43**
-
-- **Alembic 1.16.5**
-
-- **PostgreSQL 16**
-
-- **Docker**
-
-- **Docker Compose**
-
-- **Git e GitHub**
-
-- **Postman**
-
-- **Redis 7** — cache-aside
-
-- **redis-py 5.2.1** — integração do Python com Redis
-
-- **HTTPX** — chamadas HTTP ao provedor de IA
-
-- **pytest e pytest-cov** — testes automatizados e cobertura
-
-- **Streamlit** — dashboard de desempenho da API
-
-- **Plotly** — gráficos interativos do dashboard
-
-- **pandas** — tratamento dos eventos de métricas
+- catálogo de categorias e itens com CRUD protegido;
+- microsserviço de estoque com cache-aside;
+- dashboard de vendas e dashboard de desempenho da API;
+- endpoints de IA para resumir logs, consultar o banco em linguagem natural e responder perguntas sobre a documentação (RAG);
+- testes unitários e de integração, lint e validação do Docker Compose no GitHub Actions.
 
 ---
 
-## 3. Estrutura geral do projeto
+## Arquitetura
 
-Atualmente, o projeto possui uma estrutura semelhante a esta:
+### Visão dos componentes
+
+```text
+Cliente / Postman / Swagger
+        │ HTTP + JWT
+        ▼
+┌──────────────────────────────┐        ┌──────────────────┐
+│ API Django + DRF  (:8000)    │───────▶│ PostgreSQL 16    │
+│ catálogo, pedidos, IA, docs  │        │ dados principais │
+└───────┬──────────────┬───────┘        └──────────────────┘
+        │              │
+        │              └───────────────▶ Provedor LLM / Embeddings
+        │                                  (OpenAI-compatible)
+        ├──────────────────────────────▶ Redis 7 (métricas e cache)
+        │
+        └──────────────────────────────▶ Kafka (eventos de pedidos)
+
+┌──────────────────────────────┐        PostgreSQL + Redis
+│ Inventory FastAPI  (:8001)   │───────▶ cache-aside de estoque
+└──────────────────────────────┘
+
+┌──────────────────────────────┐        API Django + PostgreSQL
+│ Dashboard de Vendas (:8501)  │───────▶ pedidos, faturamento e Consulta IA
+└──────────────────────────────┘
+
+┌──────────────────────────────┐
+│ Performance Dashboard (:8502)│───────▶ Redis (métricas HTTP e cache)
+└──────────────────────────────┘
+```
+
+### Fluxo assíncrono de pedidos
+
+```text
+POST /api/v1/pedidos/
+        │ evento PedidoCriado
+        ▼
+pedidos.criado (3 partições)
+        │ grupo pedidos-worker-v1
+        ▼
+worker → PostgreSQL (Pedido)
+        │ evento PagamentoSolicitado
+        ▼
+pagamentos.solicitados
+        │ grupo pagamentos-worker-v1
+        ▼
+payment-worker → PostgreSQL (Pagamento)
+        │ evento PagamentoProcessado
+        ▼
+pagamentos.processados
+        │ grupo notificacoes-worker-v1
+        ▼
+notification-worker → PostgreSQL (Notificacao)
+        │ evento NotificacaoEnviada
+        ▼
+notificacoes.enviadas
+```
+
+Cada etapa possui retentativas com backoff e tópico de DLQ. A entrega do Kafka é pelo menos uma vez, portanto a persistência é idempotente para tolerar reprocessamentos.
+
+---
+
+## Funcionalidades
+
+### Catálogo e autenticação
+
+- CRUD de categorias e itens via Django REST Framework.
+- Autenticação JWT com `POST /api/token/` e renovação em `POST /api/token/refresh/`.
+- Rotas de catálogo restritas a usuários autenticados pertencentes ao grupo `admin`.
+- Paginação de 10 registros por página.
+- Filtro por categoria, busca por nome/descrição e ordenação por `id`, `name`, `price` e `quantity`.
+- Throttling de 10 requisições por minuto para anônimos e 30 por minuto para usuários autenticados.
+
+### Pedidos assíncronos
+
+- `POST /api/v1/pedidos/` com `Idempotency-Key` obrigatório.
+- Validação de item e quantidade; cálculo de preço unitário e valor total no servidor.
+- Publicação de `PedidoCriado` no Kafka com resposta HTTP 202.
+- Chave de idempotência armazenada no Redis com TTL padrão de 24 horas.
+- Repetição da mesma chave retorna `202` com `duplicate=true`; conteúdo diferente retorna `409`.
+- Falha de publicação ou indisponibilidade de dependências retorna `503`.
+- Worker valida o contrato do evento, persiste o pedido e trata reentregas.
+
+### Pagamento e notificação
+
+- `payment-worker` consome `pagamentos.solicitados`, valida pedido e valor, registra o pagamento simulado e publica `PagamentoProcessado`.
+- O pagamento é simulado e, na implementação atual, aprovado automaticamente.
+- `notification-worker` consome `pagamentos.processados`, registra uma notificação interna e publica `NotificacaoEnviada`.
+- `Pagamento` e `Notificacao` têm relacionamento um-para-um com `Pedido`, evitando duplicidade por pedido.
+- Falhas após três tentativas são encaminhadas ao tópico de DLQ correspondente.
+
+### Inventário com cache-aside
+
+- Microsserviço FastAPI com CRUD de itens de estoque.
+- Cache Redis para lista e detalhe, com invalidação nas operações de escrita.
+- TTL de 60 segundos para a lista (`inventory:list`) e 300 segundos para o detalhe (`inventory:{id}`).
+- Endpoint `GET /cache/metrics` com lookups, hits, misses e hit rate por endpoint.
+- Tabela `inventory_items` criada por migrações Alembic.
+
+### Assistência por IA
+
+- `POST /api/v1/assist`: resume ou explica logs técnicos com modos `summarize` e `explain`.
+- Redação de padrões sensíveis antes do envio e na resposta do modelo.
+- Timeout por chamada, até três tentativas com backoff exponencial e jitter, circuit breaker (`closed`, `open`, `half-open`) e limite de entrada.
+- Telemetria de latência, tokens e custo estimado.
+- `POST /api/v1/ask_sql`: converte perguntas em português para SQL somente leitura, valida a instrução e executa em transação read-only com `statement_timeout` e limite de linhas.
+- `POST /api/v1/ask_docs`: RAG sobre `README.md` e `docs/openapi.yaml`, com recuperação por similaridade de cosseno, citações e resposta fixa quando não há evidência suficiente.
+
+### Observabilidade e dashboards
+
+- Middleware `APIMetricsMiddleware` registra requisições sob `/api/v1/` no Redis.
+- Dashboard de desempenho com KPIs de total de requisições, latência média, p95 e taxa de erro.
+- Gráficos de latência e throughput por minuto, distribuição de status HTTP, cache do inventário e tabela detalhada.
+- Filtros por período, endpoints e grupos de status, com cache de 10 a 30 segundos.
+- Dashboard de vendas com pedidos, faturamento, ticket médio, produtos mais vendidos, exportação CSV e página **Consulta IA**.
+
+---
+
+## Stack tecnológica
+
+| Categoria | Tecnologias |
+| --- | --- |
+| Linguagem | Python 3.12 |
+| API principal | Django 5.2.6, Django REST Framework 3.16.1 |
+| Autenticação | djangorestframework-simplejwt 5.5.1 |
+| Filtros | django-filter 26.1 |
+| Microsserviço | FastAPI 0.117.1, Uvicorn 0.36.0, Pydantic |
+| Persistência | PostgreSQL 16, SQLAlchemy 2.0.43, Alembic 1.16.5, psycopg 3.2.10 |
+| Mensageria | Apache Kafka 4.2.2 (KRaft), kafka-python 3.0.11 |
+| Cache | Redis 7, redis-py 5.2.1 |
+| IA | HTTPX 0.28.1, provedores OpenAI-compatible para chat e embeddings |
+| SQL | sqlparse 0.5.3 |
+| Dashboards | Streamlit 1.66.1, pandas, Plotly |
+| Testes | pytest 9.1.1, pytest-cov 7.1.0, HTTPX, freezegun 1.5.1 |
+| Qualidade | Ruff 0.17.4 |
+| Containers | Docker, Docker Compose, BuildKit |
+| CI/CD | GitHub Actions, cache pip e GHA, DockerHub |
+| Documentação | OpenAPI 3.0.3, Swagger UI, ReDoc, Redocly CLI, Postman |
+
+---
+
+## Estrutura do projeto
 
 ```text
 Docker_Essencial/
 ├── app/
 │   ├── aula4api/
 │   │   ├── migrations/
+│   │   ├── management/commands/ingest_docs.py
+│   │   ├── admin.py
+│   │   ├── apps.py
+│   │   ├── ask_sql.py
 │   │   ├── event_contracts.py
 │   │   ├── idempotency.py
+│   │   ├── kafka_producer.py
 │   │   ├── llm_service.py
 │   │   ├── models.py
+│   │   ├── notification_worker.py
+│   │   ├── payment_worker.py
 │   │   ├── permissions.py
+│   │   ├── rag.py
+│   │   ├── rag_embeddings.py
+│   │   ├── rag_index.py
 │   │   ├── serializers.py
 │   │   ├── urls.py
-│   │   └── views.py
+│   │   ├── views.py
+│   │   └── worker.py
 │   ├── config/
 │   │   ├── metrics.py
 │   │   ├── metrics_middleware.py
 │   │   ├── settings.py
 │   │   └── urls.py
+│   ├── dashboard/
+│   │   ├── pages/2_Consulta_IA.py
+│   │   ├── ask_sql_client.py
+│   │   ├── db.py
+│   │   └── streamlit_app.py
 │   ├── inventory/
+│   │   ├── cache.py
 │   │   ├── database.py
+│   │   ├── main.py
 │   │   ├── models.py
 │   │   ├── repositories.py
-│   │   ├── services.py
 │   │   ├── schemas.py
-│   │   └── main.py
+│   │   └── services.py
 │   ├── performance_dashboard/
 │   │   ├── metrics_data.py
 │   │   └── streamlit_app.py
 │   ├── flask_app_aula3.py
 │   └── manage.py
 ├── docs/
-│   ├── openapi.yaml
-│   └── integrator-checklist.md
+│   ├── integrator-checklist.md
+│   ├── issues-aula12.md
+│   └── openapi.yaml
 ├── migrations/
+│   └── versions/
 ├── postman/
-│   ├── SynapseShop_Aula13.postman_collection.json
-│   └── environments/
-│       └── SynapseShop_Local.postman_environment.json
+│   ├── environments/SynapseShop_Local.postman_environment.json
+│   └── SynapseShop_Aula13.postman_collection.json
+├── scripts/
+│   ├── kafka-init.sh
+│   └── postgres-ssl-entrypoint.sh
 ├── tests/
+│   ├── conftest.py
 │   ├── integration/
 │   └── unit/
-│       ├── test_llm_service.py
-│       ├── test_assist_api.py
-│       ├── test_metrics.py
-│       └── test_performance_dashboard_data.py
+├── .github/workflows/ci.yml
 ├── .env.example
-├── Dockerfile
-├── Dockerfile.performance-dashboard
-├── docker-compose.yml
-├── alembic.ini
-├── requirements.txt
-├── requirements-performance-dashboard.txt
-├── pytest.ini
 ├── .coveragerc
+├── .ruff.toml
+├── alembic.ini
+├── docker-compose.yml
+├── Dockerfile
+├── Dockerfile.dashboard
+├── Dockerfile.performance-dashboard
+├── pytest.ini
+├── requirements.txt
+├── requirements-dev.txt
+├── requirements-dashboard.txt
+├── requirements-performance-dashboard.txt
+├── redocly.yaml
+├── CHANGELOG.md
 ├── PROMPTS.md
 └── README.md
 ```
 
-## Mensageria assíncrona
+---
 
-O projeto utiliza Apache Kafka para separar o recebimento dos pedidos do seu processamento em segundo plano. Quando a API recebe uma solicitação em `POST /api/v1/pedidos/`, ela publica o evento `PedidoCriado` no tópico `pedidos.criado`. Um worker independente consome esse evento e registra o pedido no PostgreSQL.
+## Como executar
 
-O worker valida os eventos, aplica controle de idempotência e realiza novas tentativas com espera progressiva (backoff). Quando uma mensagem falha após três tentativas, ela é encaminhada para o tópico `pedidos.criado.dlq`, destinado às mensagens que não puderam ser processadas.
+### Pré-requisitos
 
-A escolha do Kafka permite manter produtores e consumidores desacoplados, armazenar eventos em tópicos e acompanhar o processamento por meio de partições e offsets. O ambiente atual utiliza um único broker em modo KRaft, adequado para desenvolvimento local, mas sem alta disponibilidade.
+- Docker Desktop com Docker Compose v2.
+- Git.
+- OpenSSL para gerar os certificados TLS locais do PostgreSQL.
+- Opcional: Node.js/npm para validar o OpenAPI com Redocly.
+- Opcional: Python 3.12 para executar ferramentas fora dos containers.
 
-## Configuração do Kafka
-
-O serviço `kafka-init` executa o script `scripts/kafka-init.sh` depois que o broker fica saudável. O script configura os tópicos de forma repetível, sem recriar tópicos existentes nem reduzir suas partições.
-
-- `pedidos.criado`: três partições e retenção de três dias.
-
-- `pedidos.criado.dlq`: uma partição e retenção de 30 dias.
-
-- Grupo de consumidores: `pedidos-worker-v1`.
-
-As partições permitem distribuir o processamento entre consumidores do mesmo grupo. Os offsets registram a posição de leitura, enquanto o `LAG` indica quantas mensagens ainda faltam consumir. No teste local, duas instâncias do worker processaram mensagens das três partições e o atraso chegou a zero.
-
-O ambiente de desenvolvimento utiliza um único broker e fator de replicação 1. Portanto, ele demonstra os conceitos de particionamento e consumo concorrente, mas não oferece alta disponibilidade.
-
-## Aula 11 — Fluxo de pedido, pagamento e notificacao
-
-O fluxo de pedidos foi ampliado com dois consumidores independentes. Depois de persistir o pedido no PostgreSQL, o worker publica `PagamentoSolicitado` no topico `pagamentos.solicitados`.
-
-O `payment-worker` consome a solicitacao, valida o pedido e o valor, registra o pagamento simulado no PostgreSQL e publica `PagamentoProcessado` no topico `pagamentos.processados`. O pagamento desta atividade e simulado e, na implementacao atual, e aprovado automaticamente.
-
-O `notification-worker` consome `PagamentoProcessado`, confere os dados persistidos, registra uma notificacao interna no PostgreSQL e publica `NotificacaoEnviada` no topico `notificacoes.enviadas`.
-
-Os modelos `Pagamento` e `Notificacao` possuem relacionamento um-para-um com `Pedido`, ajudando a impedir registros duplicados para o mesmo pedido. O Redis e usado como cache auxiliar; o PostgreSQL permanece como fonte persistente dos dados.
-
-Os consumidores possuem grupos separados:
-
-- Pedidos: `pedidos-worker-v1`.
-
-- Pagamentos: `pagamentos-worker-v1`.
-
-- Notificacoes: `notificacoes-worker-v1`.
-
-As falhas de processamento possuem retentativas com backoff e topicos de DLQ. Como a entrega e pelo menos uma vez, a persistencia idempotente e importante para lidar com reprocessamentos; publicacoes de eventos podem se repetir em caso de falhas entre a persistencia e a confirmacao do offset.
-
-O teste local confirmou o caminho pedido criado, pagamento aprovado e notificacao registrada no PostgreSQL. O registro temporario de teste e suas chaves relacionadas do Redis foram removidos ao final.
-
-## Aula 12 - Testes automatizados e cobertura
-
-A suite utiliza pytest, pytest-cov, HTTPX e freezegun. Os testes rodam em container e usam SQLite em memoria para testar o microsservico de inventario sem alterar o PostgreSQL de desenvolvimento.
-
-### Estrutura
-
-- `tests/conftest.py`: fixtures compartilhadas, banco efemero, cliente HTTP, FakeRedis e relogio fixo.
-
-- `tests/unit/`: schemas, servicos, cache, sessao do banco, idempotencia e contratos de eventos.
-
-- `tests/integration/`: testes HTTP de criacao, consulta, atualizacao, exclusao e erros.
-
-- `pytest.ini`: descoberta dos testes e marcadores unit e integration.
-
-- `.coveragerc`: escopo de cobertura e limite minimo.
-
-### Convencoes
-
-Mocks e fakes isolam dependencias externas. O SQLite em memoria e recriado para cada teste. Os testes de integracao usam TestClient e conferem os status HTTP e os efeitos no banco. A fixture frozen_time fixa o horario para testes deterministas.
-
-### Executar no Windows com PowerShell e Docker
-
-Reconstruir a imagem apos mudancas nas dependencias:
+### 1. Clonar o repositório
 
 ```powershell
-
-docker compose build api
-
+git clone https://github.com/alvarocobuci-cpu/Docker_Essencial.git
+cd Docker_Essencial
 ```
 
-Executar os testes unitarios:
+### 2. Criar o arquivo `.env`
 
 ```powershell
-
-$appPath = (Resolve-Path ".\app").Path
-
-$testsPath = (Resolve-Path ".\tests").Path
-
-$pytestConfigPath = (Resolve-Path ".\pytest.ini").Path
-
-$coveragePath = (Resolve-Path ".\\.coveragerc").Path
-
-docker compose run --rm `
-
-    -v "${appPath}:/app/app" `
-
-    -v "${testsPath}:/app/tests" `
-
-    -v "${pytestConfigPath}:/app/pytest.ini:ro" `
-
-    -v "${coveragePath}:/app/.coveragerc:ro" `
-
-    api pytest -v -m unit tests
-
+Copy-Item .env.example .env
 ```
 
-Executar os testes de integracao:
+Preencha apenas o necessário para o seu ambiente. As chaves de IA podem ficar vazias para a maioria dos testes; os endpoints de IA real exigem `LLM_API_KEY`, `LLM_API_URL`, `LLM_MODEL` e, para RAG, as variáveis `EMBEDDING_*`.
+
+Nunca versione o `.env` nem chaves reais. O `.gitignore` já ignora esse arquivo.
+
+### 3. Gerar os certificados TLS do PostgreSQL
+
+O serviço `db` usa SSL obrigatório (`DB_SSLMODE=require`) e espera os arquivos em `certs/`.
 
 ```powershell
-
-docker compose run --rm `
-
-    -v "${appPath}:/app/app" `
-
-    -v "${testsPath}:/app/tests" `
-
-    -v "${pytestConfigPath}:/app/pytest.ini:ro" `
-
-    -v "${coveragePath}:/app/.coveragerc:ro" `
-
-    api pytest -v -m integration tests
-
+New-Item -ItemType Directory -Force certs | Out-Null
+openssl req -x509 -newkey rsa:2048 -nodes `
+  -keyout certs/server.key `
+  -out certs/server.crt `
+  -days 365 `
+  -subj "/CN=localhost"
 ```
 
-Executar a suite completa com cobertura:
+Se o OpenSSL não estiver disponível no Windows, execute o comando em um ambiente Linux/WSL ou via container com OpenSSL. Os certificados são locais e não devem ser versionados.
+
+### 4. Subir a stack
 
 ```powershell
-
-docker compose run --rm `
-
-    -v "${appPath}:/app/app" `
-
-    -v "${testsPath}:/app/tests" `
-
-    -v "${pytestConfigPath}:/app/pytest.ini:ro" `
-
-    -v "${coveragePath}:/app/.coveragerc:ro" `
-
-    api pytest -v `
-
-        --cov=inventory `
-
-        --cov=aula4api.idempotency `
-
-        --cov=aula4api.event_contracts `
-
-        --cov-config=/app/.coveragerc `
-
-        --cov-report=term-missing tests
-
+docker compose up -d --build
 ```
 
-### Meta de cobertura
-
-A meta minima e 85% para os modulos medidos: inventory, aula4api.idempotency e aula4api.event_contracts. A ultima execucao apresentou 52 testes aprovados e 100% de cobertura nesse escopo.
-
-Esse resultado nao representa 100% da aplicacao inteira. As views Django, os workers e outros modulos ainda precisam de testes especificos. Scripts manuais de benchmark e experimentacao ficam fora do relatorio da API.
-
-### Pendencias tecnicas
-
-As melhorias da Aula 12 foram registradas como issues no GitHub. O arquivo `docs/issues-aula12.md` mantém o contexto e as propostas originais.
-
-## Aula 13 - OpenAPI, Swagger e Postman
-
-### Documentacao local
-
-Com os servicos iniciados por Docker Compose:
-
-- API Django: http://localhost:8000
-
-- Contrato OpenAPI combinado: http://localhost:8000/openapi.yaml
-
-- Swagger UI Django: http://localhost:8000/docs/
-
-- ReDoc Django: http://localhost:8000/redoc/
-
-- Swagger UI do inventario FastAPI: http://localhost:8001/docs
-
-- ReDoc do inventario FastAPI: http://localhost:8001/redoc
-
-- OpenAPI JSON do inventario: http://localhost:8001/openapi.json
-
-### Arquivos da entrega
-
-- `docs/openapi.yaml`: contrato combinado das APIs existentes.
-
-- `redocly.yaml`: configuracao do lint do contrato.
-
-- `docs/integrator-checklist.md`: instrucoes para integradores externos.
-
-- `CHANGELOG.md`: historico de alteracoes.
-
-- `postman/SynapseShop_Aula13.postman_collection.json`: colecao Postman.
-
-- `postman/environments/SynapseShop_Local.postman_environment.json`: ambiente local.
-
-- `PROMPTS.md`: registro do trabalho com apoio de IA.
-
-### Validar a especificacao
+O Compose sobe PostgreSQL, Redis, Kafka, inicializa os tópicos, e inicia a API, os workers, o inventário e os dashboards. Acompanhe o estado com:
 
 ```powershell
-
-npx --yes @redocly/cli lint ./docs/openapi.yaml
-
+docker compose ps
 ```
 
-### Importar a colecao Postman
+### 5. Executar as migrações
 
-Importe a colecao e o ambiente indicados acima, escolha `SynapseShop - Local` e substitua os valores de credenciais de exemplo pelas credenciais locais. Os tokens sao guardados no ambiente apos o login.
+Django:
 
-### Limites conhecidos do contrato
+```powershell
+docker compose exec api python app/manage.py migrate
+```
 
-Os parametros limit, nextCursor, filtro status e sort=createdAt:desc ainda nao sao suportados pelas rotas atuais. Consulte docs/integrator-checklist.md para as convencoes existentes e as diferencas.
+Inventário (Alembic):
 
-A API de inventario ainda nao possui paginacao, filtros, ordenacao ou autenticacao JWT.
+```powershell
+docker compose exec -w /workspace inventory alembic upgrade head
+```
 
-O cabecalho `X-Trace-Id` esta documentado como convencao futura, mas ainda nao e processado pela aplicacao.
+### 6. Criar usuário administrador e grupo `admin`
 
-A resposta de erro atual nao e padronizada integralmente como RFC 7807 `application/problem+json`.
+```powershell
+docker compose exec api python app/manage.py createsuperuser
+docker compose exec api python app/manage.py shell -c "from django.contrib.auth.models import Group; Group.objects.get_or_create(name='admin')"
+```
 
-Essas diferencas estao descritas em `docs/integrator-checklist.md`.
+Depois, associe o usuário ao grupo `admin` pelo Django Admin (`http://localhost:8000/admin/`) ou por shell. As rotas de categorias e itens exigem esse grupo.
+
+### 7. Indexar a documentação para o RAG
+
+```powershell
+docker compose exec api python app/manage.py ingest_docs
+```
+
+O comando indexa `README.md` e `docs/openapi.yaml` por padrão. Use `--force` após trocar o modelo de embeddings ou os parâmetros de chunking. O índice fica no volume `rag_index_data`.
+
+### 8. Acessar os serviços
+
+| Serviço | URL |
+| --- | --- |
+| API Django | http://localhost:8000 |
+| Swagger UI | http://localhost:8000/docs/ |
+| ReDoc | http://localhost:8000/redoc/ |
+| Contrato OpenAPI | http://localhost:8000/openapi.yaml |
+| Django Admin | http://localhost:8000/admin/ |
+| Inventário FastAPI | http://localhost:8001 |
+| Swagger do inventário | http://localhost:8001/docs |
+| Dashboard de vendas | http://localhost:8501 |
+| Dashboard de desempenho | http://localhost:8502 |
+
+Para gerar dados no dashboard de desempenho, faça requisições autenticadas a `/api/v1/` usando o Postman ou o Swagger. O middleware registra apenas caminhos sob `/api/v1/`.
 
 ---
 
-## Aula 14 - Assistente de IA e llm_service
+## Serviços e portas
 
-### Objetivo
+| Serviço | Imagem/Build | Porta | Função |
+| --- | --- | --- | --- |
+| `api` | `Dockerfile` | 8000 | API Django + DRF |
+| `inventory` | `Dockerfile` | 8001 | Microsserviço FastAPI de estoque |
+| `dashboard` | `Dockerfile.dashboard` | 8501 | Dashboard de vendas + Consulta IA |
+| `performance-dashboard` | `Dockerfile.performance-dashboard` | 8502 | Painel de desempenho da API |
+| `worker` | `Dockerfile` | — | Consumidor de pedidos |
+| `payment-worker` | `Dockerfile` | — | Consumidor de pagamentos |
+| `notification-worker` | `Dockerfile` | — | Consumidor de notificações |
+| `db` | `postgres:16-alpine` | interna 5432 | PostgreSQL com TLS |
+| `redis` | `redis:7-alpine` | interna 6379 | Cache e métricas |
+| `kafka` | `apache/kafka:4.2.2` | 9092 / interna 19092 | Broker KRaft |
+| `kafka-init` | `apache/kafka:4.2.2` | — | Criação dos tópicos |
 
-Foi adicionada uma camada de assistência por IA para resumir logs técnicos ou explicar possíveis causas de falhas. O serviço fica em `app/aula4api/llm_service.py` e concentra a comunicação com o provedor, os prompts, as retentativas, o circuit breaker e a telemetria.
+---
 
-### Endpoint
+## Endpoints
 
-- Método: `POST`
-- Caminho: `/api/v1/assist`
-- Acesso: exige autenticação conforme as configurações atuais do Django REST Framework.
+### Autenticação
 
-Exemplo de requisição:
+| Método | Rota | Autenticação | Descrição |
+| --- | --- | --- | --- |
+| POST | `/api/token/` | Pública | Obtém access e refresh tokens |
+| POST | `/api/token/refresh/` | Pública | Renova o access token |
+
+### Catálogo
+
+| Método | Rota | Autenticação | Descrição |
+| --- | --- | --- | --- |
+| GET/POST | `/api/v1/categories/` | JWT + grupo `admin` | Lista/cria categorias |
+| GET/PUT/PATCH/DELETE | `/api/v1/categories/{id}/` | JWT + grupo `admin` | Detalhe e alteração |
+| GET/POST | `/api/v1/items/` | JWT + grupo `admin` | Lista/cria itens |
+| GET/PUT/PATCH/DELETE | `/api/v1/items/{id}/` | JWT + grupo `admin` | Detalhe e alteração |
+
+Parâmetros de listagem de itens: `page`, `category`, `search` e `ordering` (`id`, `name`, `price`, `quantity`; prefixo `-` para ordem decrescente).
+
+### Pedidos
+
+| Método | Rota | Autenticação | Descrição |
+| --- | --- | --- | --- |
+| POST | `/api/v1/pedidos/` | JWT | Cria pedido e publica evento no Kafka |
+
+Cabeçalhos obrigatórios: `Authorization: Bearer <token>` e `Idempotency-Key: <chave-única>`.
+
+Exemplo:
+
+```json
+{
+  "item_id": 1,
+  "quantidade": 2
+}
+```
+
+### IA e documentação
+
+| Método | Rota | Autenticação | Descrição |
+| --- | --- | --- | --- |
+| POST | `/api/v1/assist` | JWT | Resume ou explica logs |
+| POST | `/api/v1/ask_sql` | JWT | Converte pergunta em SQL somente leitura |
+| POST | `/api/v1/ask_docs` | JWT | Responde perguntas sobre a documentação indexada |
+| GET | `/openapi.yaml` | Pública | Contrato OpenAPI combinado |
+| GET | `/docs/` | Pública | Swagger UI |
+| GET | `/redoc/` | Pública | ReDoc |
+
+Exemplo de `/api/v1/assist`:
 
 ```json
 {
@@ -426,172 +461,9 @@ Exemplo de requisição:
 }
 ```
 
-O campo `mode` aceita `summarize` ou `explain`. O campo `logs` aceita um texto ou uma lista de textos. A temperatura aceita valores de `0.0` a `1.0`; `max_tokens` aceita de 1 a 256 e usa 256 como padrão.
+`mode` aceita `summarize` ou `explain`; `logs` aceita texto ou lista de textos; `temperature` vai de `0.0` a `1.0`; `max_tokens` vai de 1 a 256.
 
-A resposta contém `answer` e `meta`, com tokens de entrada e saída, latência e custo estimado. Os valores variam de acordo com a resposta do provedor e as tarifas configuradas.
-
-### Privacidade e prompts
-
-Antes de enviar os logs, o serviço aplica regras de redação para padrões reconhecidos de dados sensíveis, como e-mails, CPFs, telefones, senhas, tokens e algumas chaves. A resposta do modelo também passa por redação. Os prompts orientam o modelo a tratar o conteúdo dos logs como dados não confiáveis e a não seguir instruções encontradas dentro deles.
-
-A redação é baseada em padrões e não garante detectar toda informação sensível. Os logs devem continuar sendo tratados com cuidado. A telemetria registra metadados da chamada, sem registrar o conteúdo integral dos logs ou da resposta.
-
-### Resiliência e limites
-
-- Timeout por chamada limitado a 5 segundos.
-- Até três tentativas para timeout e falhas de rede, HTTP 408, HTTP 429 e erros HTTP 5xx.
-- Backoff exponencial com jitter entre as tentativas.
-- Circuit breaker com estados `closed`, `open` e `half-open`.
-- Limite de tamanho de entrada configurável por `LLM_MAX_INPUT_CHARS`.
-- `LLM_API_KEY`, `LLM_API_URL` e `LLM_MODEL` são configurados por variáveis de ambiente. O arquivo `.env.example` contém exemplos, não uma chave real.
-
-As tarifas `LLM_COST_INPUT_PER_1K_TOKENS` e `LLM_COST_OUTPUT_PER_1K_TOKENS` são usadas para estimar o custo. O padrão é zero; devem ser configuradas conforme o modelo utilizado para que a estimativa tenha utilidade. As métricas são agregadas em memória nesta versão e não possuem um endpoint público dedicado.
-
-### Testes e validações
-
-Os novos testes ficam em `tests/unit/test_llm_service.py` e `tests/unit/test_assist_api.py`. Eles simulam o provedor para validar timeout, HTTP 429, HTTP 5xx, indisponibilidade, resposta inválida, entrada inválida, circuit breaker, redação de dados sensíveis e códigos HTTP do endpoint. Não foi necessária uma chave real nem uma chamada real ao provedor.
-
-Na validação da Aula 14, a suíte completa apresentou **77 testes aprovados** e um aviso de depreciação do Starlette/AnyIO. O aviso não impediu a execução dos testes. Essa contagem é o resultado dos testes executados nesta etapa; não representa uma afirmação de cobertura total do código.
-
-### Melhorias futuras
-
-- Validar a integração real em ambiente controlado com credenciais protegidas.
-- Ampliar os testes das regras de redação para outros formatos de dados sensíveis.
-- Avaliar a persistência e a exportação das métricas.
-- Avaliar o comportamento do circuit breaker quando houver várias instâncias da API.
-- Manter modelos, limites e tarifas alinhados à configuração do provedor utilizado.
-
----
-
-## Aula 20 — Dashboard de Desempenho da API
-
-### Objetivo
-
-Disponibilizar um painel de observabilidade em Streamlit para acompanhar a performance da API de pedidos. As requisições feitas em `/api/v1/` são registradas pelo middleware `config.metrics_middleware.APIMetricsMiddleware` e armazenadas no Redis. O dashboard lê esses eventos, aplica filtros e exibe KPIs e gráficos.
-
-### Serviços e portas
-
-- Dashboard de desempenho (Streamlit): http://localhost:8502
-
-- Dashboard de vendas (Streamlit): http://localhost:8501
-
-- API Django: http://localhost:8000
-
-- Inventário FastAPI: http://localhost:8001
-
-### Como subir
-
-Reconstruir a imagem do dashboard:
-
-```powershell
-
-docker compose build performance-dashboard
-
-```
-
-Subir a stack:
-
-```powershell
-
-docker compose up -d
-
-```
-
-Acessar `http://localhost:8502`. Para gerar dados, use a coleção Postman da Aula 13 ou faça requisições autenticadas a `/api/v1/`. O middleware registra apenas os caminhos sob `/api/v1/`; chamadas ao Swagger, ReDoc e ao inventário não aparecem no painel.
-
-### O que o painel exibe
-
-- KPIs: total de requisições, latência média, latência p95 e taxa de erro (%).
-
-- Latência média ao longo do tempo, agrupada por minuto.
-
-- Volume de requisições por minuto (throughput).
-
-- Distribuição dos códigos HTTP (2xx, 4xx, 5xx) em gráfico de pizza.
-
-- Estatísticas de cache do inventário: hits, misses e hit rate por endpoint.
-
-- Eventos de mensageria agrupados por direção e resultado.
-
-- Tabela detalhada das requisições.
-
-### Filtros
-
-- Período: última hora, 6 horas, 24 horas, 7 dias ou todo o período.
-
-- Endpoints: seleção múltipla dos endpoints registrados.
-
-- Status HTTP: seleção múltipla dos grupos de status.
-
-Os dados são cacheados com `@st.cache_data` (10 segundos para requisições e mensageria; 30 segundos para cache) para evitar consultas repetidas ao Redis. O botão **Atualizar métricas** limpa os caches e recarrega os dados.
-
-### Variáveis de ambiente
-
-- `REDIS_URL`: endereço do Redis (padrão `redis://redis:6379/0`).
-
-- `API_METRICS_REDIS_KEY`: chave dos eventos HTTP (padrão `synapseshop:observability:requests`).
-
-- `API_METRICS_RETENTION_SECONDS`: retenção dos eventos (padrão `604800`, 7 dias).
-
-- `API_CACHE_METRICS_REDIS_KEY`: chave das métricas de cache.
-
-- `API_MESSAGING_METRICS_REDIS_KEY`: chave das métricas de mensageria.
-
-### Limitações conhecidas
-
-- A retenção é aplicada pelo processo que grava a métrica; eventos antigos são removidos no momento da escrita.
-
-- O painel de mensageria está pronto para receber dados, mas a instrumentação de produtores e consumidores do Kafka não faz parte desta etapa. Até lá, a seção exibe um aviso de estado vazio.
-
-- O middleware mede apenas a API Django sob `/api/v1/`; o microsserviço de inventário é monitorado apenas pelas estatísticas de cache.
-
-### Testes
-
-Os testes das métricas e das transformações do painel ficam em `tests/unit/test_metrics.py` e `tests/unit/test_performance_dashboard_data.py`.
-
-```powershell
-
-$appPath = (Resolve-Path ".\app").Path
-
-$testsPath = (Resolve-Path ".\tests").Path
-
-$pytestConfigPath = (Resolve-Path ".\pytest.ini").Path
-
-docker compose run --rm `
-
-    -v "${appPath}:/app/app" `
-
-    -v "${testsPath}:/app/tests" `
-
-    -v "${pytestConfigPath}:/app/pytest.ini:ro" `
-
-    api pytest -v -m unit tests
-
-```
-
-### Troubleshooting
-
-- Painel vazio: confirme que houve requisições a `/api/v1/` e que o Redis está saudável (`docker compose ps redis`).
-
-- Erro de conexão com Redis: verifique `REDIS_URL` e se o serviço `redis` está em execução.
-
-- Dados antigos: a retenção padrão é de 7 dias; ajuste `API_METRICS_RETENTION_SECONDS` se necessário.
-
----
-
-## Aula 21 — Consulta em linguagem natural (Text-to-SQL)
-
-### Objetivo
-
-Permitir que perguntas de negócio em português sejam convertidas em SQL somente leitura e executadas com segurança sobre o banco da aplicação. A página **Consulta IA** do dashboard de vendas envia a pergunta para `POST /api/v1/ask_sql`; a API usa o `llm_service` para gerar a consulta, valida a instrução e devolve o SQL, as colunas, as linhas e metadados.
-
-### Endpoint
-
-- Método: `POST`
-- Caminho: `/api/v1/ask_sql`
-- Acesso: `IsAuthenticated` (JWT via `/api/token/`).
-
-Exemplo de requisição:
+Exemplo de `/api/v1/ask_sql`:
 
 ```json
 {
@@ -599,109 +471,279 @@ Exemplo de requisição:
 }
 ```
 
-Exemplo de resposta:
+A resposta inclui `question`, `sql`, `columns`, `rows`, `row_count`, `truncated` e `meta` com latência, tokens e custo estimado. O SQL é validado antes da execução: apenas um `SELECT`/`WITH`, sem comentários, sem comandos de escrita, sem `SELECT *`, sem identificadores proibidos e apenas com as tabelas permitidas.
+
+Exemplo de `/api/v1/ask_docs`:
 
 ```json
 {
-  "question": "Quais os 5 últimos usuários cadastrados?",
-  "sql": "SELECT id, username FROM auth_user ORDER BY date_joined DESC LIMIT 5",
-  "columns": ["id", "username"],
-  "rows": [{"id": 1, "username": "ana"}],
-  "row_count": 1,
-  "truncated": false,
-  "meta": {
-    "latency_ms": 1234.5,
-    "tokens_prompt": 800,
-    "tokens_output": 60,
-    "estimated_cost_usd": 0.001
-  }
+  "question": "Como subir a API e o painel com Docker Compose?",
+  "top_k": 3,
+  "min_score": 0.25
 }
 ```
 
-Erros: `400` para payload ou consulta inválida (inclui `sql` quando disponível), `401`/`403` para autenticação, `422` para falha de execução não recuperável, `429` para limite do provedor, `502`/`503` para falhas do provedor ou de configuração e `503` para banco indisponível.
+A resposta inclui `answer`, `sources` (caminho, título, faixa de caracteres e score) e `meta`. Se o índice estiver vazio, retorna HTTP 503 com instrução para executar `ingest_docs`. Se nenhum trecho atingir `min_score`, retorna HTTP 200 com resposta de informação insuficiente e `sources: []`, sem chamar o LLM.
 
-### Schema e privacidade
+### Inventário (FastAPI)
 
-O contexto do schema inclui apenas `aula4api_category`, `aula4api_item`, `aula4api_pedido`, `aula4api_pagamento`, `aula4api_notificacao` e `auth_user`. Em `auth_user`, apenas `id`, `username`, `date_joined` e `is_active` são expostos. Colunas sensíveis como `password`, `email`, `first_name`, `last_name`, `idempotency_key` e `mensagem` são bloqueadas. As tabelas internas do Django, do Alembic, do catálogo do PostgreSQL e do inventário não fazem parte do contexto.
+| Método | Rota | Autenticação | Descrição |
+| --- | --- | --- | --- |
+| GET | `/` | Pública | Identificação do serviço |
+| GET | `/health` | Pública | Healthcheck |
+| GET | `/cache/metrics` | Pública | Métricas de cache por endpoint |
+| GET | `/inventory` | Pública | Lista itens de estoque |
+| POST | `/inventory` | Pública | Cria item de estoque |
+| GET | `/inventory/{item_id}` | Pública | Detalha item e disponibilidade |
+| PUT | `/inventory/{item_id}/quantity?quantity=12` | Pública | Atualiza quantidade |
+| DELETE | `/inventory/{item_id}` | Pública | Remove item |
 
-A pergunta é tratada como dado não confiável no prompt. O SQL gerado é validado antes da execução: apenas uma instrução `SELECT` (ou `WITH`), sem comentários, sem comandos de escrita ou administração, sem `SELECT *`, sem `tabela.*`, sem identificadores proibidos e apenas com tabelas permitidas. A execução ocorre em transação somente leitura, com `statement_timeout` e limite de linhas.
+O microsserviço de inventário ainda não possui autenticação JWT, paginação, filtros ou ordenação na listagem.
 
-### Dashboard
+### Códigos de erro comuns
 
-A página **Consulta IA** fica em `app/dashboard/pages/2_Consulta_IA.py` e é acessível pelo dashboard de vendas em http://localhost:8501. Ela oferece:
+| Código | Significado |
+| --- | --- |
+| 400 | Payload ou regra de negócio inválida |
+| 401 | Autenticação ausente ou inválida |
+| 403 | Usuário sem permissão |
+| 404 | Recurso não encontrado |
+| 409 | Conflito de idempotência |
+| 422 | Falha de execução não recuperável (Text-to-SQL/validação) |
+| 429 | Limite de requisições ou do provedor de IA |
+| 502 | Resposta inválida do provedor de IA |
+| 503 | Dependência indisponível, configuração ausente ou índice RAG vazio |
 
-- login com usuário e senha via `/api/token/` (ou uso de `ASK_SQL_API_TOKEN`);
-- renovação automática do token via `/api/token/refresh/` quando possível;
-- campo de pergunta, exemplos e exibição do SQL gerado;
-- tabela de resultados, contagem de linhas, indicador de truncamento e latência da IA.
-
-### Variáveis de ambiente
-
-- `ASK_SQL_MAX_ROWS`: limite de linhas retornadas (padrão `200`).
-- `ASK_SQL_STATEMENT_TIMEOUT_MS`: timeout da consulta (padrão `5000`).
-- `API_BASE_URL`: URL da API usada pelo dashboard (padrão `http://api:8000`).
-- `ASK_SQL_API_TOKEN`: token JWT opcional para acesso direto pelo painel; quando vazio, use o login.
-
-### Testes
-
-```powershell
-docker compose run --rm api pytest -v -m unit tests
-```
-
-Os testes cobrem extração e validação do SQL, serialização, execução somente leitura (mockada e de integração), endpoint, cliente HTTP e geração de SQL no `llm_service`. A validação com perguntas reais exige `LLM_API_KEY`, `LLM_API_URL` e `LLM_MODEL` configurados.
-
-### Troubleshooting
-
-- `503` de configuração: confira `LLM_API_KEY`, `LLM_API_URL` e `LLM_MODEL`.
-- `401` no painel: faça login novamente ou atualize `ASK_SQL_API_TOKEN`.
-- Consulta rejeitada: veja o campo `detail`; o SQL gerado é devolvido em `sql` para diagnóstico.
-- Sem dados: confirme que o banco está migrado e que o usuário do banco tem permissão de leitura.
+A aplicação não padroniza integralmente as respostas como RFC 7807 (`application/problem+json`).
 
 ---
 
-## Aula 22 — Pipeline de CI com GitHub Actions
+## Modelo de dados
 
-### Objetivo
+### Django (PostgreSQL)
 
-Automatizar lint, testes e validação do build Docker a cada `push` e `pull request` para `main` ou `master`, além de permitir execução manual. O workflow fica em `.github/workflows/ci.yml` e o status aparece no badge no topo deste README.
+```text
+Category 1 ──── N Item
+                   │
+                   │ 1
+                   ▼
+                Pedido N ──── 1 Item
+                   │
+        ┌──────────┴──────────┐
+        │ 1                   │ 1
+        ▼                     ▼
+    Pagamento             Notificacao
+```
+
+- **Category**: `id`, `name` (único).
+- **Item**: `id`, `name`, `description`, `price`, `quantity`, `category`.
+- **Pedido**: UUID, item, quantidade, preço unitário, valor total, `idempotency_key` único, status (`CRIADO`, `PAGO`, `NOTIFICADO`) e data de criação.
+- **Pagamento**: UUID, pedido (um-para-um), valor, status (`APROVADO`, `RECUSADO`), referência simulada única e data.
+- **Notificacao**: UUID, pedido (um-para-um), canal, status (`ENVIADA`), mensagem e data.
+
+### Inventário (SQLAlchemy)
+
+- **InventoryItem** (`inventory_items`): `id`, `name`, `quantity`, `minimum_quantity`, com restrições de quantidade não negativa e índice em `name`.
+
+### Índice RAG (SQLite)
+
+- Documentos e chunks com offsets de caracteres, embeddings e metadados.
+- Localmente em `app/data/rag_index.sqlite3`; no Compose em `/data/rag_index.sqlite3`, persistido no volume `rag_index_data`.
+
+---
+
+## Configuração e variáveis de ambiente
+
+O arquivo `.env.example` contém os valores de exemplo. Copie para `.env` e ajuste conforme o ambiente. Nenhum valor real de secret deve ser versionado.
+
+### Aplicação e banco
+
+| Variável | Padrão | Uso |
+| --- | --- | --- |
+| `SECRET_KEY` | fallback de desenvolvimento | Chave do Django |
+| `DB_HOST` | `db` | Host do PostgreSQL |
+| `DB_PORT` | `5432` | Porta do PostgreSQL |
+| `DB_NAME` | `appdb` | Nome do banco |
+| `DB_USER` | `appuser` | Usuário do banco |
+| `DB_PASSWORD` | `apppassword` | Senha do banco (defina a sua) |
+| `DB_SSLMODE` | `require` | Modo SSL obrigatório |
+| `DB_CONNECT_TIMEOUT_SECONDS` | `5` | Timeout de conexão |
+| `DB_POOL_SIZE` | `5` | Pool SQLAlchemy |
+| `DB_MAX_OVERFLOW` | `10` | Overflow do pool |
+| `DB_POOL_TIMEOUT_SECONDS` | `10` | Timeout do pool |
+| `DB_POOL_RECYCLE_SECONDS` | `1800` | Reciclagem de conexões |
+| `DB_CONN_MAX_AGE` | `60` | Idade máxima de conexão no Django |
+| `REDIS_URL` | `redis://redis:6379/0` | Cache e métricas |
+| `KAFKA_BOOTSTRAP_SERVERS` | `kafka:19092` | Broker Kafka |
+| `PEDIDO_IDEMPOTENCY_TTL_SECONDS` | `86400` | TTL da chave de idempotência |
+| `PEDIDOS_MAX_ATTEMPTS` | `3` | Tentativas por mensagem |
+| `PEDIDOS_RETRY_BASE_SECONDS` | `1` | Base do backoff |
+
+### Métricas e observabilidade
+
+| Variável | Padrão | Uso |
+| --- | --- | --- |
+| `API_METRICS_REDIS_KEY` | `synapseshop:observability:requests` | Eventos HTTP |
+| `API_METRICS_RETENTION_SECONDS` | `604800` | Retenção (7 dias) |
+| `API_CACHE_METRICS_REDIS_KEY` | `synapseshop:observability:cache` | Métricas de cache |
+| `API_MESSAGING_METRICS_REDIS_KEY` | `synapseshop:observability:messaging` | Métricas de mensageria |
+
+### LLM e assistência
+
+| Variável | Padrão | Uso |
+| --- | --- | --- |
+| `LLM_API_URL` | `https://api.openai.com/v1/chat/completions` | Endpoint do provedor |
+| `LLM_API_KEY` | vazio | Chave do provedor |
+| `LLM_MODEL` | placeholder | Modelo de chat |
+| `LLM_TIMEOUT_SECONDS` | `5` | Timeout por tentativa |
+| `LLM_MAX_RETRIES` | `3` | Tentativas HTTP |
+| `LLM_RETRY_BASE_SECONDS` | `0.2` | Base do backoff |
+| `LLM_CIRCUIT_FAILURE_THRESHOLD` | `3` | Falhas para abrir o circuito |
+| `LLM_CIRCUIT_RESET_SECONDS` | `30` | Tempo para half-open |
+| `LLM_COST_INPUT_PER_1K_TOKENS` | `0` | Custo de entrada por 1k tokens |
+| `LLM_COST_OUTPUT_PER_1K_TOKENS` | `0` | Custo de saída por 1k tokens |
+| `LLM_MAX_INPUT_CHARS` | `12000` | Limite de entrada |
+
+### Text-to-SQL
+
+| Variável | Padrão | Uso |
+| --- | --- | --- |
+| `ASK_SQL_MAX_ROWS` | `200` | Limite de linhas retornadas |
+| `ASK_SQL_STATEMENT_TIMEOUT_MS` | `5000` | Timeout da consulta |
+| `API_BASE_URL` | `http://api:8000` | URL usada pelo dashboard |
+| `ASK_SQL_API_TOKEN` | vazio | Token JWT opcional para o painel |
+
+### Embeddings e RAG
+
+| Variável | Padrão | Uso |
+| --- | --- | --- |
+| `EMBEDDING_API_URL` | `https://api.openai.com/v1/embeddings` | Endpoint de embeddings |
+| `EMBEDDING_API_KEY` | vazio | Chave; usa `LLM_API_KEY` se vazia |
+| `EMBEDDING_MODEL` | placeholder | Modelo de embeddings |
+| `EMBEDDING_TIMEOUT_SECONDS` | `10` | Timeout por tentativa |
+| `EMBEDDING_MAX_RETRIES` | `3` | Tentativas HTTP |
+| `EMBEDDING_RETRY_BASE_SECONDS` | `0.2` | Base do backoff |
+| `EMBEDDING_BATCH_SIZE` | `32` | Textos por requisição |
+| `RAG_INDEX_PATH` | `/data/rag_index.sqlite3` no Compose | Caminho do índice |
+| `RAG_CHUNK_TOKENS` | `400` | Tamanho aproximado do chunk |
+| `RAG_CHUNK_OVERLAP_TOKENS` | `80` | Sobreposição entre chunks |
+
+---
+
+## Testes
+
+A suíte usa `pytest`, `pytest-cov`, `HTTPX` e `freezegun`. Os testes unitários usam SQLite em memória, fakes e mocks para isolar dependências externas. Os testes de integração usam `TestClient` e também validam a execução somente leitura do Text-to-SQL contra PostgreSQL real no CI.
+
+### Estrutura
+
+- `tests/conftest.py`: fixtures compartilhadas, banco efêmero, cliente HTTP, FakeRedis e relógio fixo.
+- `tests/unit/`: schemas, serviços, cache, banco, idempotência, contratos de eventos, métricas, LLM, RAG, Text-to-SQL, clientes e dashboard.
+- `tests/integration/`: testes HTTP de inventário, ingestão real do RAG e execução somente leitura contra PostgreSQL.
+- `pytest.ini`: descoberta dos testes e marcadores `unit` e `integration`.
+- `.coveragerc`: escopo de cobertura e limite mínimo de 85% para os módulos medidos.
+
+### Executar com Docker (PowerShell)
+
+Reconstruir a imagem após mudanças nas dependências:
+
+```powershell
+docker compose build api
+```
+
+Testes unitários:
+
+```powershell
+$appPath = (Resolve-Path ".\app").Path
+$testsPath = (Resolve-Path ".\tests").Path
+$pytestConfigPath = (Resolve-Path ".\pytest.ini").Path
+$coveragePath = (Resolve-Path ".\.coveragerc").Path
+
+docker compose run --rm `
+    -v "${appPath}:/app/app" `
+    -v "${testsPath}:/app/tests" `
+    -v "${pytestConfigPath}:/app/pytest.ini:ro" `
+    -v "${coveragePath}:/app/.coveragerc:ro" `
+    api pytest -v -m unit tests
+```
+
+Testes de integração:
+
+```powershell
+docker compose run --rm `
+    -v "${appPath}:/app/app" `
+    -v "${testsPath}:/app/tests" `
+    -v "${pytestConfigPath}:/app/pytest.ini:ro" `
+    -v "${coveragePath}:/app/.coveragerc:ro" `
+    api pytest -v -m integration tests
+```
+
+Suíte completa com cobertura:
+
+```powershell
+docker compose run --rm `
+    -v "${appPath}:/app/app" `
+    -v "${testsPath}:/app/tests" `
+    -v "${pytestConfigPath}:/app/pytest.ini:ro" `
+    -v "${coveragePath}:/app/.coveragerc:ro" `
+    api pytest -v `
+        --cov=inventory `
+        --cov=aula4api.idempotency `
+        --cov=aula4api.event_contracts `
+        --cov-config=/app/.coveragerc `
+        --cov-report=term-missing tests
+```
+
+### Cobertura
+
+A meta mínima é de 85% para os módulos medidos: `inventory`, `aula4api.idempotency` e `aula4api.event_contracts`. Esse percentual não representa a aplicação inteira; views Django, workers e outros módulos possuem testes próprios, mas não entram nesse recorte de cobertura.
+
+---
+
+## CI/CD
+
+O workflow `.github/workflows/ci.yml` roda em `push` e `pull_request` para `main`/`master` e também pode ser executado manualmente (`workflow_dispatch`). O status aparece no badge no topo deste README.
 
 ### Jobs
 
-- **`test-and-lint`** (`ubuntu-latest`):
-  - checkout com `actions/checkout@v4`;
-  - Python 3.12 com `actions/setup-python@v5`;
-  - instalação de `requirements-dev.txt`;
-  - `ruff check --no-cache .`;
-  - PostgreSQL 16 efêmero com TLS, usando `scripts/postgres-ssl-entrypoint.sh`;
-  - `python app/manage.py migrate --noinput`;
-  - suíte completa com `pytest`, relatório JUnit e cobertura XML;
-  - upload de `reports/` como artifact.
+1. **`test-and-lint`**
+   - checkout com `actions/checkout@v4`;
+   - Python 3.12 com `actions/setup-python@v5` e cache `pip`;
+   - instalação de `requirements-dev.txt`;
+   - `ruff check --no-cache .`;
+   - PostgreSQL 16 efêmero com TLS na porta `55432`;
+   - migrações Django;
+   - suíte completa com `pytest`, relatório JUnit e cobertura XML;
+   - upload de `reports/` como artifact.
 
-- **`docker-build`** (`ubuntu-latest`):
-  - checkout;
-  - `docker build -t synapseshop-api:test .` com BuildKit.
+2. **`compose-validation`**
+   - geração de certificados TLS;
+   - `docker compose config --quiet`;
+   - build das imagens da API e do dashboard;
+   - subida de `db`, `redis` e `kafka` com healthchecks;
+   - inicialização dos tópicos Kafka;
+   - migrações e validação do comando `ingest_docs --help`;
+   - subida de `api` e `dashboard`;
+   - verificação de HTTP, API → PostgreSQL, dashboard → PostgreSQL e dashboard → API;
+   - coleta de logs em falha e `docker compose down -v --remove-orphans`.
 
-### PostgreSQL no CI
+3. **`publish`**
+   - executa apenas em `push` para `main`/`master` ou `workflow_dispatch`;
+   - usa `docker/login-action` e `docker/build-push-action@v6`;
+   - publica `<DOCKERHUB_USERNAME>/synapseshop-api:latest` e `<DOCKERHUB_USERNAME>/synapseshop-api:<commit-sha>`;
+   - usa cache GHA com escopo `api`.
 
-Os testes unitários usam SQLite, fakes e mocks. O teste `tests/integration/test_ask_sql_integration.py` valida a execução somente leitura contra PostgreSQL real. Por isso o CI sobe um banco efêmero com SSL (`sslmode=require`), executa as migrações e só então roda a suíte.
-
-O banco usa a porta `55432` no runner para evitar conflito com serviços locais. Os certificados são gerados em tempo de execução e não são versionados.
-
-### Lint
-
-O Ruff é instalado por `requirements-dev.txt` e configurado em `.ruff.toml` com as regras `E` e `F`. `E402` é ignorado por causa dos imports após ajustes de `sys.path` e `django.setup()`; `E501` é ignorado por causa de SQL e linhas longas existentes. O Ruff não faz parte da imagem de runtime.
-
-### Secrets e variáveis no GitHub
+### Secrets do GitHub
 
 Configure em **Settings → Secrets and variables → Actions**:
 
 | Nome | Uso |
 | --- | --- |
-| `SECRET_KEY` | Chave do Django. No CI há um fallback apenas para testes. |
+| `SECRET_KEY` | Chave do Django. No CI há fallback apenas para testes. |
 | `DB_PASSWORD` | Senha do PostgreSQL efêmero. No CI há fallback `apppassword`. |
-| `LLM_API_KEY` | Não é necessário no CI; os testes mockam o provedor. |
+| `DOCKERHUB_USERNAME` | Usuário ou organização do DockerHub. |
+| `DOCKERHUB_TOKEN` | Token com permissão de push no repositório. |
 
-O projeto usa `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` e `DB_SSLMODE` em vez de uma única `DB_URL`. Nenhum valor real deve ser versionado. O `SECRET_KEY` é lido do ambiente em `app/config/settings.py`; localmente, o fallback de desenvolvimento continua disponível.
+`LLM_API_KEY` e `EMBEDDING_API_KEY` não são necessárias no CI; os testes usam provedores falsos/mocks.
 
 ### Execução local equivalente
 
@@ -709,86 +751,7 @@ O projeto usa `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` e `DB_SS
 python -m pip install -r requirements-dev.txt
 ruff check --no-cache .
 docker build -t synapseshop-api:test .
-```
 
-Para a suíte completa no ambiente Docker do projeto:
-
-```powershell
-$appPath = (Resolve-Path ".\app").Path
-$testsPath = (Resolve-Path ".\tests").Path
-$pytestConfigPath = (Resolve-Path ".\pytest.ini").Path
-docker compose run --rm `
-  -v "${appPath}:/app/app" `
-  -v "${testsPath}:/app/tests" `
-  -v "${pytestConfigPath}:/app/pytest.ini:ro" `
-  api pytest -v
-```
-
-### Limitações
-
-- Publicação em registry, deploy e cache avançado de dependências foram implementados na Aula 23.
-- O badge só exibe o status depois que o workflow rodar no GitHub.
-- O PostgreSQL do CI é efêmero e não persiste dados.
-
----
-
-## Aula 23 — Cache, Docker Compose e publicação no DockerHub
-
-### Objetivo
-
-Reduzir o tempo do pipeline com cache de dependências Python e camadas Docker, validar a orquestração real dos serviços com Docker Compose e publicar a imagem da API no DockerHub em execuções controladas.
-
-### Pipeline
-
-O workflow `.github/workflows/ci.yml` agora tem três jobs:
-
-- **`test-and-lint`**: instala as dependências com cache `pip`, executa Ruff, sobe PostgreSQL 16 efêmero com TLS, roda migrações e a suíte completa.
-- **`compose-validation`**: gera certificados TLS, valida a configuração do Compose, constrói as imagens da API e do painel, sobe `db`, `redis` e `kafka`, inicializa os tópicos, roda migrações, inicia `api` e `dashboard` e verifica a comunicação entre os serviços.
-- **`publish`**: executa somente em `push` para `main`/`master` ou em `workflow_dispatch`. Usa `docker/login-action` e `docker/build-push-action` para publicar a imagem da API.
-
-### Cache
-
-- O cache de pacotes Python usa `actions/setup-python@v5` com `cache: pip` e inclui os arquivos `requirements*.txt`.
-- O cache de camadas Docker usa o backend `type=gha` do `docker/build-push-action`, com o escopo `api`.
-- O cache só é efetivo no GitHub Actions; execuções locais não compartilham esse cache.
-
-### Validação com Docker Compose
-
-O job `compose-validation` valida o caminho `db` → `api` → `dashboard`:
-
-- `docker compose config --quiet`;
-- `docker compose build api dashboard`;
-- subida de `db`, `redis` e `kafka` com `--wait`;
-- execução do `kafka-init`;
-- migrações com `python app/manage.py migrate --noinput`;
-- subida de `api` e `dashboard` com healthchecks;
-- `curl` em `http://localhost:8000/openapi.yaml` e `http://localhost:8501/_stcore/health`;
-- verificação de API → PostgreSQL, painel → PostgreSQL e painel → API;
-- coleta de logs e `docker compose down -v --remove-orphans` ao final.
-
-O healthcheck da API usa `/openapi.yaml`; a comunicação com o banco é verificada separadamente com uma conexão Django. O painel usa `/_stcore/health` e verifica o banco via SQLAlchemy.
-
-### Publicação no DockerHub
-
-Configure em **Settings → Secrets and variables → Actions**:
-
-| Nome | Uso |
-| --- | --- |
-| `DOCKERHUB_USERNAME` | Usuário ou organização do DockerHub. |
-| `DOCKERHUB_TOKEN` | Token de acesso com permissão de push no repositório. |
-
-A imagem publicada é:
-
-```text
-<DOCKERHUB_USERNAME>/synapseshop-api:latest
-<DOCKERHUB_USERNAME>/synapseshop-api:<commit-sha>
-```
-
-O job não publica em `pull_request`. Se os secrets não estiverem configurados, o job falha; nenhum valor deve ser versionado.
-
-### Execução local equivalente
-
-```powershell
 docker compose config --quiet
 docker compose build api dashboard
 docker compose up -d --wait db redis kafka
@@ -800,128 +763,87 @@ curl.exe -fsS http://localhost:8501/_stcore/health
 docker compose down
 ```
 
-### Limitações
+Evite `docker compose down -v` localmente se quiser preservar dados. No CI o runner é efêmero, por isso o volume é removido.
 
-- O push real ao DockerHub só ocorre no GitHub Actions com os secrets configurados.
-- O cache GHA não é reproduzido localmente.
-- A validação do Compose sobe apenas `db`, `redis`, `kafka`, `api` e `dashboard`; workers, inventory e performance-dashboard não são exercitados nesse job.
-- O CI usa `docker compose down -v` porque o runner é efêmero; localmente, evite `-v` para preservar dados.
-- O ambiente de CI é efêmero e não persiste dados.
+---
 
-## Aula 24 — Assistente RAG sobre a documentação
+## Segurança e privacidade
 
-### Objetivo
+- **Autenticação**: JWT via SimpleJWT; rotas de catálogo exigem grupo `admin`.
+- **Autorização**: `IsAuthenticated` nas rotas de pedidos e IA; `IsAdminRole` no catálogo.
+- **Throttling**: 10 requisições/minuto para anônimos e 30 para autenticados.
+- **Idempotência**: `Idempotency-Key` no Redis evita pedidos duplicados e conflitos retornam `409`.
+- **Text-to-SQL**: schema curado, tabelas permitidas, colunas sensíveis bloqueadas, apenas `SELECT`/`WITH`, transação read-only, `statement_timeout` e limite de linhas.
+- **Privacidade na IA**: redação de padrões de e-mails, CPFs, telefones, senhas, tokens e chaves antes do envio e na resposta. Logs são tratados como dados não confiáveis no prompt.
+- **RAG**: a pergunta do usuário e os trechos recuperados são tratados como dados não confiáveis; o modelo é instruído a não seguir instruções embutidas no conteúdo.
+- **Segredos**: `SECRET_KEY`, senhas, chaves de LLM/embeddings e tokens do DockerHub vêm de variáveis de ambiente; nada real deve ser versionado.
+- **Banco**: PostgreSQL com TLS obrigatório (`sslmode=require`).
+- **Containers**: executam com usuário não-root.
 
-Responder perguntas sobre o projeto usando somente a documentação indexada, com recuperação de trechos, citações e limites explícitos quando não há evidência suficiente.
+A redação é baseada em padrões e não garante detectar toda informação sensível. A telemetria registra metadados das chamadas, sem armazenar o conteúdo integral dos logs ou das respostas.
 
-### Arquitetura
+---
 
-- `app/aula4api/rag_index.py`: índice SQLite, chunking com offsets, armazenamento de embeddings e busca por similaridade de cosseno.
-- `app/aula4api/rag_embeddings.py`: cliente OpenAI-compatible para gerar embeddings em lote.
-- `app/aula4api/rag.py`: ingestão, recuperação, guardrails e montagem das citações.
-- `app/aula4api/management/commands/ingest_docs.py`: comando explícito de indexação.
-- `app/aula4api/views.py`: endpoint autenticado `POST /api/v1/ask_docs`.
-- `app/aula4api/llm_service.py`: prompt de documentação, redação de dados sensíveis e geração da resposta.
+## Limitações conhecidas
 
-O índice fica em um arquivo SQLite separado do PostgreSQL. Localmente, o caminho padrão é `app/data/rag_index.sqlite3`. No Docker Compose, o arquivo fica em `/data/rag_index.sqlite3`, persistido no volume nomeado `rag_index_data`.
+- **Kafka**: ambiente local com um único broker em KRaft e fator de replicação 1; demonstra particionamento e consumo concorrente, mas não alta disponibilidade.
+- **Entrega**: semântica pelo menos uma vez; reprocessamentos e publicações duplicadas podem ocorrer em falhas entre persistência e confirmação de offset. A persistência é idempotente para mitigar.
+- **Dashboard de desempenho**: mede apenas a API Django sob `/api/v1/`; o inventário é monitorado apenas pelas estatísticas de cache.
+- **Mensageria no painel**: a seção está pronta, mas a instrumentação de produtores/consumidores Kafka não é registrada no Redis nesta versão; a seção exibe estado vazio.
+- **OpenAPI**: `limit`, `nextCursor`, filtro `status` e `sort=createdAt:desc` não são suportados pelas rotas atuais. `X-Trace-Id` está documentado como convenção futura, mas não é processado.
+- **Erros**: não há padronização integral como RFC 7807 `application/problem+json`.
+- **Inventário**: sem autenticação JWT, paginação, filtros ou ordenação.
+- **RAG**: indexação explícita; mudanças em `README.md` ou `docs/openapi.yaml` exigem novo `ingest_docs`. O índice SQLite é local do container; múltiplas réplicas exigiriam armazenamento compartilhado. O endpoint não valida semanticamente cada citação retornada pelo modelo.
+- **IA**: a validação automatizada usa provedores falsos e não mede a qualidade real das respostas. A qualidade depende do provedor e do modelo configurados.
+- **Circuit breaker**: o estado é em memória por processo; múltiplas instâncias não compartilham o estado.
+- **Cobertura**: a meta de 85% vale apenas para os módulos medidos, não para a aplicação inteira.
+- **CI**: o PostgreSQL do CI é efêmero e não persiste dados; o cache GHA não é reproduzido localmente.
 
-### Ingestão
+---
 
-Por padrão, o comando indexa `README.md` e `docs/openapi.yaml`:
+## Histórico do projeto
 
-```powershell
-python app/manage.py ingest_docs
-```
-
-Também é possível escolher arquivos, índice e forçar a reindexação:
-
-```powershell
-python app/manage.py ingest_docs --paths README.md docs/openapi.yaml
-python app/manage.py ingest_docs --index app/data/rag_index.sqlite3
-python app/manage.py ingest_docs --force
-```
-
-No Compose:
-
-```powershell
-docker compose exec api python app/manage.py ingest_docs
-```
-
-O comando ignora arquivos cujo conteúdo e modelo de embedding não mudaram. Use `--force` após trocar o modelo de embedding ou os parâmetros de chunking. Não há reindexação automática na subida da API.
-
-### Endpoint
-
-```http
-POST /api/v1/ask_docs
-Authorization: Bearer <access-token>
-Content-Type: application/json
-
-{
-  "question": "Como subir a API e o painel com Docker Compose?",
-  "top_k": 3,
-  "min_score": 0.25
-}
-```
-
-`top_k` aceita valores de 1 a 5. `min_score` aceita valores de 0 a 1. A resposta inclui a resposta gerada, as fontes recuperadas e metadados:
-
-```json
-{
-  "question": "Como subir a API e o painel com Docker Compose?",
-  "answer": "Use docker compose up -d --wait ... [README.md#1200-2800]",
-  "sources": [
-    {
-      "path": "README.md",
-      "title": "Docker Essencial",
-      "range": "1200-2800",
-      "score": 0.82
-    }
-  ],
-  "meta": {
-    "top_k": 3,
-    "min_score": 0.25,
-    "retrieved": 1,
-    "llm": {
-      "latency_ms": 850.0,
-      "tokens_prompt": 900,
-      "tokens_output": 120
-    }
-  }
-}
-```
-
-O campo `range` usa offsets de caracteres com fim exclusivo. Se o índice estiver vazio, o endpoint retorna HTTP 503 com a instrução de execução do `ingest_docs`. Se nenhum trecho atingir `min_score`, a API retorna HTTP 200 com uma resposta fixa de informação insuficiente e `sources: []`, sem chamar o LLM.
-
-### Variáveis de ambiente
-
-| Nome | Uso |
+| Aula | Tema |
 | --- | --- |
-| `EMBEDDING_API_URL` | URL OpenAI-compatible do provedor de embeddings. |
-| `EMBEDDING_API_KEY` | Chave do provedor; se vazia, usa `LLM_API_KEY`. |
-| `EMBEDDING_MODEL` | Modelo de embeddings configurado. |
-| `EMBEDDING_TIMEOUT_SECONDS` | Timeout por tentativa. |
-| `EMBEDDING_MAX_RETRIES` | Número máximo de tentativas HTTP. |
-| `EMBEDDING_RETRY_BASE_SECONDS` | Base do backoff exponencial. |
-| `EMBEDDING_BATCH_SIZE` | Quantidade de textos por requisição. |
-| `RAG_INDEX_PATH` | Caminho do arquivo SQLite do índice. |
-| `RAG_CHUNK_TOKENS` | Tamanho aproximado do chunk em tokens. |
-| `RAG_CHUNK_OVERLAP_TOKENS` | Sobreposição aproximada entre chunks. |
+| 3 | Aplicação Flask com Docker e PostgreSQL |
+| 5 | Microsserviço de inventário com FastAPI |
+| 6 | Persistência com SQLAlchemy e migrações Alembic |
+| 7 | Autenticação JWT e segurança |
+| 8 | Cache-aside com Redis |
+| 11 | Mensageria com Kafka, pagamento e notificação |
+| 12 | Testes automatizados e cobertura |
+| 13 | OpenAPI, Swagger, ReDoc e Postman |
+| 14 | Assistente de IA e `llm_service` |
+| 20 | Dashboard de desempenho da API |
+| 21 | Consulta em linguagem natural (Text-to-SQL) |
+| 22 | Pipeline de CI com GitHub Actions |
+| 23 | Cache, Docker Compose e publicação no DockerHub |
+| 24 | Assistente RAG sobre a documentação |
 
-### Persistência no Docker
+O detalhamento de cada entrega está em [`CHANGELOG.md`](CHANGELOG.md). O registro do trabalho com apoio de IA está em [`PROMPTS.md`](PROMPTS.md).
 
-O Compose monta `rag_index_data:/data` na API e define `RAG_INDEX_PATH=/data/rag_index.sqlite3`. Para recriar a API mantendo o índice:
+---
+
+## Documentação relacionada
+
+- [`docs/openapi.yaml`](docs/openapi.yaml): contrato combinado das APIs Django e inventário.
+- [`docs/integrator-checklist.md`](docs/integrator-checklist.md): convenções, autenticação, limites e diferenças para integradores externos.
+- [`postman/SynapseShop_Aula13.postman_collection.json`](postman/SynapseShop_Aula13.postman_collection.json): coleção com os fluxos principais.
+- [`postman/environments/SynapseShop_Local.postman_environment.json`](postman/environments/SynapseShop_Local.postman_environment.json): ambiente local.
+- [`CHANGELOG.md`](CHANGELOG.md): histórico de alterações.
+- [`PROMPTS.md`](PROMPTS.md): engenharia de prompts e registro de uso de IA.
+- [`redocly.yaml`](redocly.yaml): configuração do lint do contrato OpenAPI.
+
+### Validar o contrato OpenAPI
 
 ```powershell
-docker compose up -d --build api
+npx --yes @redocly/cli lint ./docs/openapi.yaml
 ```
 
-Para remover também o índice persistido, remova o volume explicitamente. Evite `docker compose down -v` em ambientes com dados que devem ser preservados.
+### Importar a coleção Postman
 
-### Limitações
+Importe a coleção e o ambiente, selecione `SynapseShop - Local` e substitua as credenciais de exemplo pelas credenciais locais. Os tokens são armazenados no ambiente após o login.
 
-- A indexação é explícita; mudanças em `README.md` ou `docs/openapi.yaml` exigem novo `ingest_docs`.
-- A qualidade das respostas depende do provedor de embeddings e do modelo de linguagem configurados.
-- O SQLite é um arquivo local do container; múltiplas réplicas da API exigiriam armazenamento compartilhado ou reindexação por réplica.
-- O endpoint não valida semanticamente cada citação retornada pelo modelo; os `sources` são os trechos efetivamente recuperados.
-- Não há interface de chat no painel; a entrega é pela API e pelo OpenAPI.
-- Sem credenciais reais de embedding/LLM, a validação automatizada usa provedores falsos e não mede qualidade real das respostas.
+---
+
+Projeto desenvolvido durante o curso de Programação em Python do Senac, mantido no mesmo repositório para acompanhar a evolução das atividades.
