@@ -264,3 +264,194 @@ def assist(request):
             },
             status=status.HTTP_400_BAD_REQUEST,
         )
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def ask_sql(request):
+    from . import ask_sql as ask_sql_service
+    from .llm_service import (
+        CircuitOpenError,
+        LLMConfigurationError,
+        LLMInvalidPayloadError,
+        LLMProviderError,
+        LLMRateLimitError,
+        LLMServiceError,
+    )
+    from .serializers import AskSQLRequestSerializer
+
+    serializer = AskSQLRequestSerializer(data=request.data)
+
+    if not serializer.is_valid():
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        result = ask_sql_service.answer(
+            serializer.validated_data["question"]
+        )
+        return Response(result, status=status.HTTP_200_OK)
+
+    except ask_sql_service.SQLValidationError as exc:
+        logger.warning("ask_sql_failed error_type=validation")
+        payload = {"detail": str(exc)}
+
+        if exc.sql:
+            payload["sql"] = exc.sql
+
+        return Response(
+            payload,
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    except ask_sql_service.SQLExecutionError as exc:
+        logger.warning(
+            "ask_sql_failed error_type=execution retryable=%s",
+            exc.retryable,
+        )
+        payload = {"detail": str(exc)}
+
+        if exc.sql:
+            payload["sql"] = exc.sql
+
+        response_status = (
+            status.HTTP_503_SERVICE_UNAVAILABLE
+            if exc.retryable
+            else status.HTTP_422_UNPROCESSABLE_ENTITY
+        )
+
+        return Response(payload, status=response_status)
+
+    except LLMRateLimitError:
+        logger.warning("ask_sql_failed error_type=rate_limit")
+        return Response(
+            {"detail": "O provedor de IA esta limitando as requisicoes."},
+            status=status.HTTP_429_TOO_MANY_REQUESTS,
+        )
+
+    except (CircuitOpenError, LLMConfigurationError):
+        logger.warning("ask_sql_failed error_type=unavailable")
+        return Response(
+            {"detail": "O servico de IA esta temporariamente indisponivel."},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    except (LLMProviderError, LLMInvalidPayloadError):
+        logger.warning("ask_sql_failed error_type=provider")
+        return Response(
+            {
+                "detail": (
+                    "Nao foi possivel obter uma resposta valida "
+                    "do provedor de IA."
+                )
+            },
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+
+    except LLMServiceError:
+        logger.warning("ask_sql_failed error_type=service")
+        return Response(
+            {"detail": "Ocorreu um erro ao processar a solicitacao de IA."},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+
+    except ValueError:
+        logger.warning("ask_sql_failed error_type=invalid_input")
+        return Response(
+            {
+                "detail": (
+                    "A pergunta e invalida ou excede "
+                    "os limites permitidos."
+                )
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def ask_docs(request):
+    from . import rag as rag_service
+    from .llm_service import (
+        CircuitOpenError,
+        LLMConfigurationError,
+        LLMInvalidPayloadError,
+        LLMProviderError,
+        LLMRateLimitError,
+        LLMServiceError,
+    )
+    from .rag_index import RAGIndexEmptyError, RAGIndexError
+    from .serializers import AskDocsRequestSerializer
+
+    serializer = AskDocsRequestSerializer(data=request.data)
+
+    if not serializer.is_valid():
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        result = rag_service.answer(**serializer.validated_data)
+        return Response(result, status=status.HTTP_200_OK)
+
+    except RAGIndexEmptyError as exc:
+        logger.warning("ask_docs_failed error_type=empty_index")
+        return Response(
+            {"detail": str(exc)},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    except RAGIndexError:
+        logger.warning("ask_docs_failed error_type=index")
+        return Response(
+            {"detail": "O indice RAG esta temporariamente indisponivel."},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    except LLMRateLimitError:
+        logger.warning("ask_docs_failed error_type=rate_limit")
+        return Response(
+            {"detail": "O provedor de IA esta limitando as requisicoes."},
+            status=status.HTTP_429_TOO_MANY_REQUESTS,
+        )
+
+    except (CircuitOpenError, LLMConfigurationError):
+        logger.warning("ask_docs_failed error_type=unavailable")
+        return Response(
+            {"detail": "O servico de IA esta temporariamente indisponivel."},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    except (LLMProviderError, LLMInvalidPayloadError):
+        logger.warning("ask_docs_failed error_type=provider")
+        return Response(
+            {
+                "detail": (
+                    "Nao foi possivel obter uma resposta valida "
+                    "do provedor de IA."
+                )
+            },
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+
+    except LLMServiceError:
+        logger.warning("ask_docs_failed error_type=service")
+        return Response(
+            {"detail": "Ocorreu um erro ao processar a solicitacao de IA."},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+
+    except ValueError:
+        logger.warning("ask_docs_failed error_type=invalid_input")
+        return Response(
+            {
+                "detail": (
+                    "A pergunta e invalida ou excede "
+                    "os limites permitidos."
+                )
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )

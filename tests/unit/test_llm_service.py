@@ -11,7 +11,9 @@ from aula4api.llm_service import (
     LLMProviderError,
     LLMRateLimitError,
     LLMService,
+    build_docs_messages,
     build_messages,
+    build_sql_messages,
     redact_sensitive_data,
 )
 
@@ -266,3 +268,151 @@ def test_prompts_treat_logs_as_untrusted_data():
     assert messages[1]["role"] == "user"
     assert "dados nao confiaveis" in messages[0]["content"].lower()
     assert "Falha simulada" in messages[1]["content"]
+
+
+def test_build_sql_messages_marks_schema_and_question():
+    messages = build_sql_messages(
+        "Qual o total vendido?",
+        "Tabela aula4api_pedido (valor_total)",
+    )
+
+    assert messages[0]["role"] == "system"
+    assert messages[1]["role"] == "user"
+    assert "select" in messages[0]["content"].lower()
+    assert "schema" in messages[0]["content"].lower()
+    assert "aula4api_pedido" in messages[1]["content"]
+    assert "Qual o total vendido?" in messages[1]["content"]
+
+
+def test_generate_sql_sends_temperature_and_max_tokens(monkeypatch):
+    captured = []
+
+    def fake_post(url, **kwargs):
+        captured.append(kwargs)
+        return FakeResponse(
+            payload={
+                "choices": [{"message": {"content": "SELECT 1"}}],
+                "usage": {
+                    "prompt_tokens": 1,
+                    "completion_tokens": 1,
+                },
+            }
+        )
+
+    service = build_service(monkeypatch, fake_post)
+    service.generate_sql("Conte os pedidos", "schema")
+
+    body = captured[0]["json"]
+
+    assert body["temperature"] == 0.0
+    assert body["max_tokens"] == 512
+    assert body["messages"][0]["role"] == "system"
+    assert "schema" in body["messages"][1]["content"]
+
+
+def test_generate_sql_does_not_redact_sql(monkeypatch):
+    sql = (
+        "SELECT id FROM auth_user "
+        "WHERE email IS NOT NULL LIMIT 5"
+    )
+
+    service = build_service(
+        monkeypatch,
+        lambda url, **kwargs: FakeResponse(
+            payload={
+                "choices": [{"message": {"content": sql}}],
+                "usage": {
+                    "prompt_tokens": 1,
+                    "completion_tokens": 1,
+                },
+            }
+        ),
+    )
+
+    result = service.generate_sql(
+        "Liste usuarios com email",
+        "schema",
+    )
+
+    assert result["answer"] == sql
+
+
+def test_generate_sql_rejects_blank_question(monkeypatch):
+    calls = []
+    service = build_service(
+        monkeypatch,
+        lambda url, **kwargs: calls.append(kwargs),
+    )
+
+    with pytest.raises(ValueError):
+        service.generate_sql("   ", "schema")
+
+    assert calls == []
+
+
+def test_generate_sql_uses_retry_policy(monkeypatch):
+    calls = []
+
+    def failing_post(url, **kwargs):
+        calls.append(kwargs)
+        return FakeResponse(status_code=503)
+
+    service = build_service(monkeypatch, failing_post)
+
+    with pytest.raises(LLMProviderError):
+        service.generate_sql("Liste os itens", "schema")
+
+    assert len(calls) == 3
+
+
+def test_build_docs_messages_marks_context_untrusted_and_redacts():
+    messages = build_docs_messages(
+        "Como configurar? usuario@example.com",
+        "[README.md#0-10]\nUse password=Segredo123",
+    )
+
+    assert messages[0]["role"] == "system"
+    assert "dados nao confiaveis" in messages[0]["content"]
+    assert "[README.md#0-10]" in messages[1]["content"]
+    assert "[EMAIL_REDACTED]" in messages[1]["content"]
+    assert "Segredo123" not in messages[1]["content"]
+
+
+def test_generate_docs_answer_uses_docs_mode_and_redacts_answer(
+    monkeypatch,
+    caplog,
+):
+    caplog.set_level(logging.INFO, logger="aula4api.llm")
+    captured = []
+
+    def fake_post(url, **kwargs):
+        captured.append(kwargs)
+        return FakeResponse(
+            payload={
+                "choices": [{
+                    "message": {
+                        "content": (
+                            "Resposta [README.md#0-10] "
+                            "contato resposta@example.com"
+                        )
+                    }
+                }],
+                "usage": {
+                    "prompt_tokens": 10,
+                    "completion_tokens": 5,
+                },
+            }
+        )
+
+    service = build_service(monkeypatch, fake_post)
+    result = service.generate_docs_answer(
+        "Como configurar?",
+        "[README.md#0-10]\nUse Docker Compose.",
+    )
+
+    assert "[README.md#0-10]" in result["answer"]
+    assert "resposta@example.com" not in result["answer"]
+    assert "[EMAIL_REDACTED]" in result["answer"]
+    assert '"mode": "docs"' in caplog.text
+    assert captured[0]["json"]["temperature"] == 0.0
+    assert captured[0]["json"]["max_tokens"] == 512

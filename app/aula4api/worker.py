@@ -5,8 +5,6 @@ import os
 import sys
 import time
 import uuid
-from datetime import datetime, timezone
-from decimal import Decimal
 
 import redis
 from django.db import transaction

@@ -1,0 +1,9 @@
+target-version = "py312"
+line-length = 88
+
+[lint]
+select = ["E", "F"]
+ignore = ["E402", "E501"]
+
+[lint.per-file-ignores]
+"migrations/env.py" = ["F401"]

@@ -12,6 +12,7 @@ services:
       DB_USER: ${DB_USER:-appuser}
       DB_PASSWORD: ${DB_PASSWORD:-apppassword}
       DB_SSLMODE: ${DB_SSLMODE:-require}
+      SECRET_KEY: ${SECRET_KEY:-}
       DB_CONNECT_TIMEOUT_SECONDS: ${DB_CONNECT_TIMEOUT_SECONDS:-5}
       DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
       DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-10}
@@ -24,6 +25,10 @@ services:
       REDIS_URL: redis://redis:6379/0
       KAFKA_BOOTSTRAP_SERVERS: kafka:19092
       PEDIDO_IDEMPOTENCY_TTL_SECONDS: 86400
+      API_METRICS_REDIS_KEY: ${API_METRICS_REDIS_KEY:-synapseshop:observability:requests}
+      API_METRICS_RETENTION_SECONDS: ${API_METRICS_RETENTION_SECONDS:-604800}
+      API_CACHE_METRICS_REDIS_KEY: ${API_CACHE_METRICS_REDIS_KEY:-synapseshop:observability:cache}
+      API_MESSAGING_METRICS_REDIS_KEY: ${API_MESSAGING_METRICS_REDIS_KEY:-synapseshop:observability:messaging}
       LLM_API_URL: ${LLM_API_URL:-https://api.openai.com/v1/chat/completions}
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_MODEL: ${LLM_MODEL:-replace-with-supported-model}
@@ -35,6 +40,30 @@ services:
       LLM_COST_INPUT_PER_1K_TOKENS: ${LLM_COST_INPUT_PER_1K_TOKENS:-0}
       LLM_COST_OUTPUT_PER_1K_TOKENS: ${LLM_COST_OUTPUT_PER_1K_TOKENS:-0}
       LLM_MAX_INPUT_CHARS: ${LLM_MAX_INPUT_CHARS:-12000}
+      ASK_SQL_MAX_ROWS: ${ASK_SQL_MAX_ROWS:-200}
+      ASK_SQL_STATEMENT_TIMEOUT_MS: ${ASK_SQL_STATEMENT_TIMEOUT_MS:-5000}
+      EMBEDDING_API_URL: ${EMBEDDING_API_URL:-https://api.openai.com/v1/embeddings}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-replace-with-supported-embedding-model}
+      EMBEDDING_TIMEOUT_SECONDS: ${EMBEDDING_TIMEOUT_SECONDS:-10}
+      EMBEDDING_MAX_RETRIES: ${EMBEDDING_MAX_RETRIES:-3}
+      EMBEDDING_RETRY_BASE_SECONDS: ${EMBEDDING_RETRY_BASE_SECONDS:-0.2}
+      EMBEDDING_BATCH_SIZE: ${EMBEDDING_BATCH_SIZE:-32}
+      RAG_INDEX_PATH: ${RAG_INDEX_PATH:-/data/rag_index.sqlite3}
+      RAG_CHUNK_TOKENS: ${RAG_CHUNK_TOKENS:-400}
+      RAG_CHUNK_OVERLAP_TOKENS: ${RAG_CHUNK_OVERLAP_TOKENS:-80}
+    volumes:
+      - rag_index_data:/data
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/openapi.yaml', timeout=2)"
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
     depends_on:
       db:
         condition: service_healthy
@@ -56,6 +85,7 @@ services:
       DB_USER: ${DB_USER:-appuser}
       DB_PASSWORD: ${DB_PASSWORD:-apppassword}
       DB_SSLMODE: ${DB_SSLMODE:-require}
+      SECRET_KEY: ${SECRET_KEY:-}
       DB_CONNECT_TIMEOUT_SECONDS: ${DB_CONNECT_TIMEOUT_SECONDS:-5}
       DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
       DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-10}
@@ -93,6 +123,7 @@ services:
       DB_USER: ${DB_USER:-appuser}
       DB_PASSWORD: ${DB_PASSWORD:-apppassword}
       DB_SSLMODE: ${DB_SSLMODE:-require}
+      SECRET_KEY: ${SECRET_KEY:-}
       DB_CONNECT_TIMEOUT_SECONDS: ${DB_CONNECT_TIMEOUT_SECONDS:-5}
       DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
       DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-10}
@@ -130,6 +161,7 @@ services:
       DB_USER: ${DB_USER:-appuser}
       DB_PASSWORD: ${DB_PASSWORD:-apppassword}
       DB_SSLMODE: ${DB_SSLMODE:-require}
+      SECRET_KEY: ${SECRET_KEY:-}
       DB_CONNECT_TIMEOUT_SECONDS: ${DB_CONNECT_TIMEOUT_SECONDS:-5}
       DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
       DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-10}
@@ -209,8 +241,49 @@ services:
       POSTGRES_DB: ${DB_NAME:-appdb}
       POSTGRES_USER: ${DB_USER:-appuser}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-apppassword}
+      API_BASE_URL: ${API_BASE_URL:-http://api:8000}
+      ASK_SQL_API_TOKEN: ${ASK_SQL_API_TOKEN:-}
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=2)"
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
     depends_on:
       db:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    volumes:
+      - ./app:/app/app:ro
+    command:
+      - streamlit
+      - run
+      - app/dashboard/streamlit_app.py
+      - --server.address=0.0.0.0
+      - --server.port=8501
+      - --server.runOnSave=true
+      - --server.fileWatcherType=poll
+    restart: unless-stopped
+
+  performance-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.performance-dashboard
+    ports:
+      - "8502:8502"
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      API_METRICS_REDIS_KEY: ${API_METRICS_REDIS_KEY:-synapseshop:observability:requests}
+      API_METRICS_RETENTION_SECONDS: ${API_METRICS_RETENTION_SECONDS:-604800}
+      API_CACHE_METRICS_REDIS_KEY: ${API_CACHE_METRICS_REDIS_KEY:-synapseshop:observability:cache}
+      API_MESSAGING_METRICS_REDIS_KEY: ${API_MESSAGING_METRICS_REDIS_KEY:-synapseshop:observability:messaging}
+    depends_on:
+      redis:
         condition: service_healthy
     restart: unless-stopped
 
@@ -293,3 +366,4 @@ services:
 
 volumes:
   postgres_data:
+  rag_index_data:

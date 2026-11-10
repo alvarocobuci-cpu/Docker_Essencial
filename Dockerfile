@@ -22,9 +22,11 @@ COPY --from=builder /install /usr/local
 
 COPY app/ ./app/
 COPY docs/ ./docs/
+COPY README.md ./README.md
 
 RUN useradd --create-home --shell /bin/bash appuser \
-    && chown -R appuser:appuser /app
+    && mkdir -p /data \
+    && chown -R appuser:appuser /app /data
 
 USER appuser
 

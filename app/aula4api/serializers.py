@@ -67,6 +67,54 @@ class PedidoCreateSerializer(serializers.Serializer):
     quantidade = serializers.IntegerField(
         min_value=1,
     )
+class AskSQLRequestSerializer(serializers.Serializer):
+    question = serializers.CharField(
+        max_length=500,
+        trim_whitespace=True,
+        allow_blank=False,
+    )
+
+    def validate_question(self, value):
+        value = value.strip()
+
+        if not value:
+            raise serializers.ValidationError(
+                "Informe a pergunta."
+            )
+
+        return value
+
+
+class AskDocsRequestSerializer(serializers.Serializer):
+    question = serializers.CharField(
+        max_length=500,
+        trim_whitespace=True,
+        allow_blank=False,
+    )
+    top_k = serializers.IntegerField(
+        min_value=1,
+        max_value=5,
+        required=False,
+        default=3,
+    )
+    min_score = serializers.FloatField(
+        min_value=0.0,
+        max_value=1.0,
+        required=False,
+        default=0.25,
+    )
+
+    def validate_question(self, value):
+        value = value.strip()
+
+        if not value:
+            raise serializers.ValidationError(
+                "Informe a pergunta."
+            )
+
+        return value
+
+
 class AssistRequestSerializer(serializers.Serializer):
     mode = serializers.ChoiceField(
         choices=("summarize", "explain")

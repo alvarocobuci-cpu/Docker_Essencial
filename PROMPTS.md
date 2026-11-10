@@ -333,6 +333,225 @@ As variáveis de configuração incluem URL, chave e modelo do provedor, timeout
 
 ---
 
+## Aula 20 — Dashboard de Desempenho da API
+
+### Objetivo do apoio de IA
+
+Construir um painel de observabilidade em Streamlit para visualizar métricas de desempenho da API de pedidos, com KPIs, gráficos interativos, filtros e cache de consultas, integrado ao Docker Compose.
+
+### Principais prompts utilizados — resumo
+
+1. Projetar um dashboard em Streamlit que consuma eventos HTTP armazenados no Redis, sem acoplar o painel ao banco principal.
+2. Criar cards de KPI para total de requisições, latência média, latência p95 e taxa de erro.
+3. Criar gráfico de linha para latência média por minuto e gráfico de barras para throughput.
+4. Criar gráfico de pizza para a distribuição dos grupos de status HTTP (2xx, 4xx, 5xx).
+5. Adicionar filtros de período, endpoint e status HTTP na barra lateral, mantendo os demais gráficos sincronizados.
+6. Usar `@st.cache_data` para evitar consultas repetidas ao Redis e documentar o TTL escolhido.
+7. Separar a leitura/transformação dos dados em um módulo testável, sem depender de Streamlit nos testes.
+8. Adicionar uma seção de cache do inventário lendo os contadores já gravados no Redis.
+9. Preparar uma seção de mensageria com estado vazio amigável, sem instrumentar produtores e consumidores nesta etapa.
+10. Configurar o serviço `performance-dashboard` no `docker-compose.yml` e documentar build, acesso e variáveis de ambiente.
+11. Escrever testes unitários para a montagem dos eventos, normalização, filtros, KPIs e agregações.
+12. Atualizar README, CHANGELOG, `.env.example` e este arquivo com as decisões e limitações.
+
+### Desenvolvimento registrado
+
+O middleware `config.metrics_middleware.APIMetricsMiddleware` mede apenas requisições sob `/api/v1/` e grava eventos no Redis por meio de `config/metrics.py`. O dashboard fica em `app/performance_dashboard/streamlit_app.py` e usa `app/performance_dashboard/metrics_data.py` para parse, filtros, KPIs e agregações. O Streamlit é exposto na porta `8502` pelo serviço `performance-dashboard`.
+
+Os KPIs e gráficos usam os eventos filtrados. A seção de cache lê `cache:metrics:inventory_list` e `cache:metrics:inventory_detail`. A seção de mensageria lê a chave `synapseshop:observability:messaging` e informa quando não há eventos.
+
+### Validações executadas
+
+- `docker compose config` validado após a correção do `docker-compose.yml`.
+- Imagem do `performance-dashboard` construída e serviço iniciado.
+- Endpoint de saúde do Streamlit consultado em `http://localhost:8502/_stcore/health`.
+- Requisições de teste enviadas à API para popular os KPIs e filtros.
+- Testes unitários de `config/metrics.py` e `performance_dashboard/metrics_data.py` executados com pytest.
+
+### Observações e limites conhecidos
+
+- O painel depende do Redis; se o serviço estiver indisponível, as seções mostram aviso de erro.
+- A instrumentação de mensageria (produtores e consumidores Kafka) não faz parte desta etapa; a seção existe, mas fica vazia até essa instrumentação ser adicionada.
+- O middleware não mede o microsserviço de inventário; apenas os contadores de cache são exibidos.
+- A retenção padrão das métricas é de sete dias e é aplicada no momento da escrita.
+
+---
+
+## Aula 21 — Consulta em linguagem natural (Text-to-SQL)
+
+### Objetivo do apoio de IA
+
+Implementar um endpoint que converte perguntas de negócio em português para SQL somente leitura, com validação de segurança, execução controlada e uma página no dashboard para consulta.
+
+### Principais prompts utilizados — resumo
+
+1. Projetar o fluxo pergunta → prompt → SQL → validação → execução → resposta JSON.
+2. Definir um contexto de schema curado, com apenas tabelas e colunas necessárias, ocultando dados pessoais e tabelas internas.
+3. Reutilizar o `llm_service` existente, incluindo resiliência, circuit breaker e telemetria, sem redigir o SQL de saída.
+4. Validar o SQL com `sqlparse`: uma única instrução, apenas `SELECT`/`WITH`, sem comentários, sem comandos de escrita ou administração e sem `SELECT *`.
+5. Bloquear identificadores sensíveis e tabelas não permitidas, com suporte a CTEs.
+6. Executar em transação somente leitura, com `statement_timeout` e limite de linhas.
+7. Expor `POST /api/v1/ask_sql` com autenticação JWT e mapeamento de erros.
+8. Criar uma página Streamlit multipágina no dashboard de vendas, com login, renovação de token, exemplos e exibição do SQL e da tabela.
+9. Escrever testes unitários para extração, validação, serialização, endpoint, cliente HTTP e geração de SQL.
+10. Atualizar README, CHANGELOG, OpenAPI e `.env.example`.
+
+### Desenvolvimento registrado
+
+O endpoint fica em `app/aula4api/views.py` e delega para `app/aula4api/ask_sql.py`. O contexto de schema, as listas de permissão e as validações ficam nesse módulo. A geração usa `llm_service.generate_sql`, que reutiliza o pipeline de retentativas e circuit breaker com `temperature=0.0`.
+
+A execução usa `connection.cursor()` dentro de `transaction.atomic()`, com `SET TRANSACTION READ ONLY` e `SET LOCAL statement_timeout`. O resultado é serializado para tipos JSON e limitado por `ASK_SQL_MAX_ROWS`.
+
+O painel usa `app/dashboard/ask_sql_client.py` para chamar a API e `app/dashboard/pages/2_Consulta_IA.py` para a interface. O login usa `/api/token/`; o refresh usa `/api/token/refresh/`.
+
+### Validações executadas
+
+- `docker compose config` para validar o Compose.
+- Testes unitários de validação, endpoint, cliente HTTP e `generate_sql`.
+- Execução somente leitura validada contra o PostgreSQL local com SQL conhecido e CTE.
+- Endpoint sem autenticação retornou `401`; página validada com AppTest sem exceções.
+- Health check do dashboard verificado.
+- A validação com LLM real não foi executada por ausência de `LLM_API_KEY`.
+
+### Observações e limites conhecidos
+
+- A qualidade do SQL depende do modelo e do contexto de schema; o validador reduz, mas não elimina, o risco de consultas incorretas.
+- A execução é somente leitura e limitada, mas o usuário do banco ainda deve ter permissões mínimas.
+- O `ASK_SQL_API_TOKEN` é opcional e deve ser tratado como segredo; sem ele, o painel solicita login.
+- A validação com LLM real exige credenciais configuradas; sem elas, o endpoint retorna `503`.
+
+---
+
+## Aula 22 — Pipeline de CI com GitHub Actions
+
+### Objetivo do apoio de IA
+
+Automatizar lint, testes e validação do build Docker em GitHub Actions, mantendo segredos fora do repositório e garantindo que o teste de integração Text-to-SQL rode contra PostgreSQL real.
+
+### Principais prompts utilizados — resumo
+
+1. Analisar a suíte pytest e identificar dependências externas, especialmente o teste de integração que exige PostgreSQL com TLS.
+2. Estruturar `.github/workflows/ci.yml` com `push`, `pull_request` e `workflow_dispatch`.
+3. Separar os jobs `test-and-lint` e `docker-build`.
+4. Escolher Ruff, criar `requirements-dev.txt` e `.ruff.toml` sem adicionar ferramentas de lint à imagem de runtime.
+5. Abstrair `SECRET_KEY` por variável de ambiente e usar secrets do GitHub com fallback para CI.
+6. Subir PostgreSQL 16 efêmero com TLS no runner, executar migrações e rodar `pytest` com relatórios.
+7. Validar o build da imagem com `docker build -t synapseshop-api:test .`.
+8. Atualizar README, badge, CHANGELOG e este histórico.
+
+### Desenvolvimento registrado
+
+O workflow fica em `.github/workflows/ci.yml`. O job `test-and-lint` instala `requirements-dev.txt`, executa `ruff check --no-cache .`, inicia um container PostgreSQL com o entrypoint TLS do projeto, roda `python app/manage.py migrate --noinput` e executa a suíte completa. Os relatórios JUnit e cobertura são enviados como artifact. O job `docker-build` valida o empacotamento da imagem da API.
+
+O `SECRET_KEY` passou a ser lido do ambiente em `app/config/settings.py`, com fallback local. O CI usa `secrets.SECRET_KEY` e `secrets.DB_PASSWORD` quando configurados; caso contrário, usa valores efêmeros de teste.
+
+### Validações executadas
+
+- Parse do YAML do workflow.
+- `ruff check --no-cache .` no repositório.
+- Suíte completa com `pytest`.
+- Build local da imagem com `docker build`.
+- Inicialização do PostgreSQL efêmero com TLS e `pg_isready`.
+
+### Observações e limites conhecidos
+
+- Publicação em registry, deploy e cache avançado de dependências foram implementados na Aula 23.
+- O workflow real só pode ser executado no GitHub após o push.
+- Segredos reais devem ser configurados no painel do GitHub; os fallbacks existem apenas para o CI.
+
+---
+
+## Aula 23 — Cache, orquestração e publicação no DockerHub
+
+### Objetivo do apoio de IA
+
+Reduzir o tempo do pipeline, validar a subida conjunta dos serviços com Docker Compose e configurar a publicação da imagem da API no DockerHub sem versionar credenciais.
+
+### Principais prompts utilizados — resumo
+
+1. Revisar o workflow da Aula 22 e identificar onde adicionar cache de dependências Python e camadas Docker.
+2. Adicionar cache `pip` ao `actions/setup-python@v5`.
+3. Estruturar um job de validação com `docker compose config`, build, migrações e healthchecks.
+4. Definir healthchecks para `api` e `dashboard` e ajustar a dependência entre eles.
+5. Validar API → PostgreSQL, painel → PostgreSQL e painel → API.
+6. Configurar `docker/login-action` e `docker/build-push-action` com tags `latest` e SHA.
+7. Restringir a publicação a push em `main`/`master` e `workflow_dispatch`.
+8. Atualizar README, CHANGELOG e este histórico.
+
+### Desenvolvimento registrado
+
+O job `test-and-lint` passou a usar cache `pip` com `cache-dependency-path` para os arquivos de requirements. O antigo job `docker-build` foi substituído por `compose-validation`, que constrói as imagens da API e do painel, sobe `db`, `redis` e `kafka`, executa `kafka-init`, aplica migrações e inicia `api` e `dashboard` com healthchecks.
+
+A comunicação é verificada em três direções: a API abre uma conexão Django com o PostgreSQL, o painel executa `SELECT 1` via SQLAlchemy e o painel consulta `/openapi.yaml` da API. Em caso de falha, o workflow imprime o estado e os logs do Compose e publica `compose-logs.txt` como artifact; a limpeza usa `docker compose down -v --remove-orphans`.
+
+O job `publish` usa `docker/setup-buildx-action`, `docker/login-action` e `docker/build-push-action`. Ele publica somente a imagem da API, com tags `latest` e o SHA do commit, e usa cache GHA no escopo `api`. A execução ocorre em push para `main`/`master` ou em `workflow_dispatch`, nunca em `pull_request`.
+
+### Validações executadas
+
+- Parse do YAML do workflow.
+- `docker compose config --quiet`.
+- `ruff check --no-cache .`.
+- Suíte completa com `pytest`.
+- Build das imagens da API e do painel com Docker Compose.
+- Subida de `db`, `redis`, `kafka`, `api` e `dashboard`, com migrações e healthchecks.
+- Checagens de API → PostgreSQL, painel → PostgreSQL e painel → API.
+- `git diff --check`.
+
+### Observações e limites conhecidos
+
+- O push real ao DockerHub depende dos secrets `DOCKERHUB_USERNAME` e `DOCKERHUB_TOKEN` e só ocorre no GitHub Actions.
+- O cache GHA não é reproduzido localmente.
+- A validação do Compose não sobe workers, inventory nem performance-dashboard.
+- O workflow real só pode ser executado no GitHub após o push.
+
+---
+
+## Aula 24 — Assistente RAG sobre a documentação
+
+### Objetivo do apoio de IA
+
+Projetar e implementar um assistente que responde perguntas usando somente a documentação do projeto, com recuperação de trechos, citações e guardrails contra respostas sem evidência.
+
+### Principais prompts utilizados — resumo
+
+1. Comparar armazenamento do índice em SQLite, PostgreSQL e vetor dedicado; escolher a opção compatível com o escopo da aula.
+2. Definir ingestão explícita por comando e reindexação com `--force`.
+3. Definir autenticação JWT obrigatória e variáveis `EMBEDDING_*` com fallback para `LLM_API_KEY`.
+4. Planejar chunking com offsets, sobreposição e busca por similaridade de cosseno.
+5. Definir guardrails para índice vazio, ausência de trechos acima de `min_score` e citações obrigatórias.
+6. Planejar persistência do índice no Docker Compose e cópia do `README.md` na imagem.
+7. Atualizar OpenAPI, README, CHANGELOG e testes automatizados.
+
+### Desenvolvimento registrado
+
+O índice foi implementado em SQLite, com tabelas `documents` e `chunks`, embeddings em BLOB float32 normalizados e busca por cosseno. A ingestão calcula hash SHA-256 do conteúdo e ignora arquivos inalterados quando o modelo de embedding também não mudou.
+
+O cliente de embeddings usa uma API OpenAI-compatible, processa textos em lotes, aplica timeout e retries com backoff e valida quantidade, índices, dimensões e valores finitos. As falhas reutilizam a taxonomia de erros do `llm_service`, permitindo o mesmo mapeamento HTTP do endpoint `ask_docs`.
+
+O endpoint `POST /api/v1/ask_docs` exige JWT, aceita `top_k` de 1 a 5 e `min_score` de 0 a 1. Se o índice estiver vazio, retorna 503 antes de chamar o provedor. Se nenhum trecho passar pelo limite de similaridade, retorna 200 com resposta fixa e `sources: []`, sem chamar o LLM. Quando há trechos, o contexto é montado com identificadores `[caminho#inicio-fim]` e enviado ao prompt de documentação.
+
+O Compose passou a montar `rag_index_data:/data` na API e a definir `RAG_INDEX_PATH=/data/rag_index.sqlite3`. A imagem copia o `README.md` e cria `/data` com permissão para `appuser`.
+
+### Validações executadas
+
+- Testes unitários de chunking, offsets, busca, filtros, reindexação, embeddings, guardrails e mapeamento HTTP.
+- Teste de integração indexando `README.md` e `docs/openapi.yaml` com embedder falso.
+- `ruff check --no-cache .`.
+- Suíte completa com `pytest`.
+- `python app/manage.py check`.
+- `docker compose config --quiet`.
+- Build da imagem da API e validação do comando `ingest_docs` no Compose.
+
+### Observações e limites conhecidos
+
+- A qualidade real das respostas depende de credenciais e modelos externos; os testes usam provedores falsos.
+- A indexação é explícita e não há watcher ou reindexação automática.
+- O índice SQLite é local ao container; múltiplas réplicas exigiriam compartilhamento ou reindexação por réplica.
+- As citações são os trechos recuperados; o conteúdo textual retornado pelo LLM não é validado semanticamente.
+- Não foi adicionada interface de chat ao painel.
+
+---
+
 ## 3. Convenções gerais de uso de IA
 
 - Os prompts apresentados neste documento são resumos representativos, não transcrições completas.

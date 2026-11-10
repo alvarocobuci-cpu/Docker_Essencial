@@ -25,6 +25,8 @@ tags:
     description: Estado dos servicos
   - name: Cache
     description: Metricas do cache de inventario
+  - name: AI
+    description: Consulta em linguagem natural e assistencia por IA
 
 paths:
   /api/token/:
@@ -624,6 +626,98 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationError'
 
+  /api/v1/ask_sql:
+    post:
+      tags: [AI]
+      summary: Converter pergunta em linguagem natural em consulta SQL somente leitura
+      operationId: askSql
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AskSQLRequest'
+      responses:
+        '200':
+          description: Consulta executada com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AskSQLResponse'
+        '400':
+          description: Pergunta invalida ou consulta rejeitada pela validacao
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorSchema'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: Consulta valida que falhou ao executar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorSchema'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '502':
+          description: Resposta invalida ou indisponibilidade do provedor de LLM
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorSchema'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/v1/ask_docs:
+    post:
+      tags: [AI]
+      summary: Responder pergunta usando a documentacao indexada
+      operationId: askDocs
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AskDocsRequest'
+      responses:
+        '200':
+          description: Resposta gerada com as fontes recuperadas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AskDocsResponse'
+        '400':
+          description: Pergunta ou parametros invalidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorSchema'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '502':
+          description: Resposta invalida ou indisponibilidade do provedor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorSchema'
+        '503':
+          description: Indice RAG vazio ou servico de IA indisponivel
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorSchema'
+
 components:
   securitySchemes:
     BearerAuth:
@@ -936,6 +1030,127 @@ components:
         available:
           type: boolean
           description: True quando quantity for maior que zero.
+
+    AskSQLRequest:
+      type: object
+      required: [question]
+      properties:
+        question:
+          type: string
+          minLength: 1
+          maxLength: 500
+          example: Quais os 5 ultimos usuarios cadastrados?
+
+    AskSQLMeta:
+      type: object
+      properties:
+        latency_ms:
+          type: number
+          format: float
+        tokens_prompt:
+          type: integer
+        tokens_output:
+          type: integer
+        estimated_cost_usd:
+          type: number
+          format: float
+      additionalProperties: true
+
+    AskSQLResponse:
+      type: object
+      required: [question, sql, columns, rows, row_count, truncated, meta]
+      properties:
+        question:
+          type: string
+        sql:
+          type: string
+          example: SELECT id, username FROM auth_user ORDER BY date_joined DESC LIMIT 5
+        columns:
+          type: array
+          items:
+            type: string
+        rows:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        row_count:
+          type: integer
+        truncated:
+          type: boolean
+        meta:
+          $ref: '#/components/schemas/AskSQLMeta'
+
+    AskDocsRequest:
+      type: object
+      required: [question]
+      properties:
+        question:
+          type: string
+          minLength: 1
+          maxLength: 500
+          example: Como subir a API e o painel com Docker Compose?
+        top_k:
+          type: integer
+          minimum: 1
+          maximum: 5
+          default: 3
+          description: Quantidade maxima de trechos recuperados.
+        min_score:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          default: 0.25
+          description: Similaridade minima de cosseno para usar um trecho.
+
+    AskDocsSource:
+      type: object
+      required: [path, title, range, score]
+      properties:
+        path:
+          type: string
+          example: README.md
+        title:
+          type: string
+          example: Docker Essencial
+        range:
+          type: string
+          description: Intervalo de caracteres no documento, com fim exclusivo.
+          example: 1200-2800
+        score:
+          type: number
+          format: float
+          example: 0.82
+
+    AskDocsMeta:
+      type: object
+      properties:
+        top_k:
+          type: integer
+        min_score:
+          type: number
+          format: float
+        retrieved:
+          type: integer
+        llm:
+          $ref: '#/components/schemas/AskSQLMeta'
+      additionalProperties: true
+
+    AskDocsResponse:
+      type: object
+      required: [question, answer, sources, meta]
+      properties:
+        question:
+          type: string
+        answer:
+          type: string
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/AskDocsSource'
+        meta:
+          $ref: '#/components/schemas/AskDocsMeta'
 
   responses:
     BadRequest:

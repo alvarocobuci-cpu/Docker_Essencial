@@ -13,3 +13,6 @@ env
 .vscode
 
 *.md
+!README.md
+
+app/data/

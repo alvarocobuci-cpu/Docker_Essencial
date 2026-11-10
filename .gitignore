@@ -22,3 +22,9 @@ htmlcov/
 
 # Certificados TLS locais do PostgreSQL
 /certs/
+
+# Relatorios de testes do CI
+/reports/
+
+# Indice RAG local
+app/data/

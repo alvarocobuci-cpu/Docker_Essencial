@@ -1,0 +1,21 @@
+﻿FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+COPY requirements-performance-dashboard.txt ./requirements.txt
+
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY app/performance_dashboard/ ./app/performance_dashboard/
+
+RUN useradd --create-home --shell /usr/sbin/nologin dashboard \
+    && chown -R dashboard:dashboard /app
+
+USER dashboard
+
+EXPOSE 8502
+
+CMD ["streamlit", "run", "app/performance_dashboard/streamlit_app.py", "--server.address=0.0.0.0", "--server.port=8502"]

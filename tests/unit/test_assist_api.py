@@ -37,12 +37,12 @@ def post_assist():
             format="json",
         )
         force_authenticate(
-    request,
-    user=SimpleNamespace(
-        is_authenticated=True,
-        pk=1,
-    ),
-)
+            request,
+            user=SimpleNamespace(
+                is_authenticated=True,
+                pk=1,
+            ),
+        )
         return assist(request)
 
     return make_request

@@ -1,5 +1,6 @@
 Django==5.2.6
 djangorestframework==3.16.1
+sqlparse==0.5.3
 psycopg[binary]==3.2.10
 fastapi==0.117.1
 uvicorn[standard]==0.36.0
